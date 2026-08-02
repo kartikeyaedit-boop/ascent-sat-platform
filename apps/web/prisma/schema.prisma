@@ -1,4 +1,4 @@
-// Prisma schema for Cadence, an AI public speaking coach.
+// Prisma schema for Speechly, an AI public speaking coach.
 // Identity/auth models below are generic and unchanged from the project's
 // earlier form. Speech-domain models are added in prisma/schema.prisma as
 // each phase needs them (see docs/database-schema.md).

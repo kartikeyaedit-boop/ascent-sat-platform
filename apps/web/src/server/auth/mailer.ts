@@ -83,7 +83,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 
 export function verificationEmail(link: string) {
   return {
-    subject: "Verify your email — Cadence",
+    subject: "Verify your email — Speechly",
     text: `Welcome! Verify your email by visiting: ${link}\nThis link expires in 24 hours.`,
     html: `<p>Welcome! Verify your email by clicking the link below.</p><p><a href="${link}">${link}</a></p><p>This link expires in 24 hours.</p>`,
   };
@@ -91,7 +91,7 @@ export function verificationEmail(link: string) {
 
 export function passwordResetEmail(link: string) {
   return {
-    subject: "Reset your password — Cadence",
+    subject: "Reset your password — Speechly",
     text: `Reset your password by visiting: ${link}\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
     html: `<p>Reset your password by clicking the link below.</p><p><a href="${link}">${link}</a></p><p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>`,
   };

@@ -1,4 +1,4 @@
-# Cadence — AI Public Speaking Coach
+# Speechly — AI Public Speaking Coach
 
 An AI speaking coach that listens through your microphone and gives real,
 explained feedback in real time — confidence, clarity, pace, filler words,

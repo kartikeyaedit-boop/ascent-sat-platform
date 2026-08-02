@@ -2,7 +2,7 @@
 
 ## Overview
 
-Cadence is a single Next.js 15 (App Router) application serving both the
+Speechly is a single Next.js 15 (App Router) application serving both the
 frontend and the backend API (via Route Handlers) — the same shape as
 before the pivot, since that decision had nothing to do with the product
 being SAT prep specifically.
