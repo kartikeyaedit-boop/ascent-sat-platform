@@ -33,11 +33,11 @@ export function AppTopNav() {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-sm font-semibold text-orange-500">
           <Flame className="size-4" />
-          <span title="Streak — coming in Phase 2">0</span>
+          <span title="Streak — coming in Phase 4">0</span>
         </div>
         <div
           className="hidden items-center gap-2 sm:flex"
-          title="XP — coming in Phase 2"
+          title="XP — coming in Phase 4"
         >
           <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
             <div className="h-full w-0 rounded-full bg-primary" />

@@ -9,8 +9,9 @@ planned.
 ## Tech stack
 
 Next.js 15 (App Router) · TypeScript · TailwindCSS · shadcn/ui · Framer
-Motion · React Query · Zustand · Prisma · PostgreSQL · JWT auth · Deepgram
-(live speech-to-text) · Claude (coaching feedback)
+Motion · React Query · Zustand · Prisma · PostgreSQL · JWT auth · browser
+Speech Recognition API (live speech-to-text, no key needed) · rule-based
+coaching engine (no LLM API, no key needed)
 
 ## Project structure
 
@@ -25,7 +26,7 @@ apps/web/
                      client-side for live scores and server-side as the
                      source of truth)
   src/hooks/        React Query hooks + use-speech-session.ts (the
-                     mic → Deepgram → live-metrics state machine)
+                     mic → Speech Recognition → live-metrics state machine)
   prisma/           Schema, migrations, seed script
   tests/e2e/        Playwright E2E tests (unit tests are colocated with
                      source as *.test.ts)
@@ -53,8 +54,8 @@ You need a PostgreSQL connection string (`DATABASE_URL`/`DIRECT_URL` —
 Supabase's pooled + direct connection strings work well), a
 `JWT_ACCESS_SECRET`, and a `RESEND_API_KEY` for real email delivery
 (optional in dev — without it, verification/reset emails are logged to the
-console instead of sent). From Phase 1 onward you'll also need
-`DEEPGRAM_API_KEY` and `ANTHROPIC_API_KEY`.
+console instead of sent). Speech features need no configuration at all —
+see [docs/architecture.md](docs/architecture.md) for why.
 
 Then run the migration and seed script:
 
@@ -94,8 +95,8 @@ Visit http://localhost:3000.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — including how live audio feedback
-  works on a serverless platform
+- [Architecture](docs/architecture.md) — including why speech features run
+  entirely on free, keyless browser APIs instead of paid services
 - [Database schema](docs/database-schema.md)
 - [API specification](docs/api-spec.md)
 - [Roadmap](docs/roadmap.md)

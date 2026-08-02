@@ -32,6 +32,7 @@ model User {
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  speechSessions          SpeechSession[]
 
   @@map("users")
 }
@@ -75,4 +76,50 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// Every score below is computed server-side by src/lib/speech-metrics.ts
+// from the submitted transcript + word timestamps — never trusted directly
+// from the client, even though the client computes the same numbers live
+// for in-progress display during recording. See docs/architecture.md.
+model SpeechSession {
+  id                String   @id @default(cuid())
+  userId            String
+  mode              String
+  promptText        String?
+  transcript        String
+  durationSeconds   Int
+  wpm               Float
+  fillerWords       Json // [{ word, timestampMs }]
+  pauseCount        Int
+  longPauseCount    Int
+  avgPauseMs        Float
+  confidenceScore   Int
+  confidenceExplanation Json // string[] — why the confidence score is what it is
+  clarityScore      Int
+  paceScore         Int
+  vocalVarietyScore Int
+  overallScore      Int
+  createdAt         DateTime @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedback CoachingFeedback?
+
+  @@index([userId])
+  @@map("speech_sessions")
+}
+
+model CoachingFeedback {
+  id               String   @id @default(cuid())
+  sessionId        String   @unique
+  strengths        Json // string[]
+  weaknesses       Json // string[]
+  actionPlan       Json // string[]
+  practiceDrills   Json // string[]
+  motivationalNote String
+  createdAt        DateTime @default(now())
+
+  session SpeechSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("coaching_feedback")
 }

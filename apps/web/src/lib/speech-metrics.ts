@@ -1,0 +1,293 @@
+/**
+ * Speech scoring engine — pure functions, no I/O.
+ *
+ * Used BOTH client-side (live scores while recording) and server-side (the
+ * authoritative recompute on submit — client-reported numbers are never
+ * trusted directly, see POST /api/speech/sessions). Same math, one source
+ * of truth, so live and final scores never disagree.
+ *
+ * Every score here comes from a real measured signal — word timings and
+ * per-word confidence from the speech-to-text engine, and pitch/volume
+ * sampled from the Web Audio API — combined via a documented, explainable
+ * formula. None of it is a trained ML model: there's no labeled training
+ * data to train one on, and a black-box score would violate the product's
+ * core promise of always explaining *why* a score is what it is.
+ */
+
+export interface WordTimestamp {
+  word: string;
+  startMs: number;
+  endMs: number;
+  /** Speech-to-text engine's own confidence for this word, 0-1. */
+  confidence: number;
+}
+
+export interface AudioSample {
+  atMs: number;
+  value: number;
+}
+
+export interface FillerOccurrence {
+  word: string;
+  timestampMs: number;
+}
+
+export type PauseClassification = "natural" | "long" | "awkward";
+
+export interface PauseInfo {
+  afterWordIndex: number;
+  startMs: number;
+  durationMs: number;
+  classification: PauseClassification;
+}
+
+export interface PauseAnalysis {
+  pauses: PauseInfo[];
+  pauseCount: number;
+  longPauseCount: number;
+  avgPauseMs: number;
+  score: number;
+}
+
+export interface PaceResult {
+  wpm: number;
+  score: number;
+  label: "too slow" | "slightly slow" | "ideal" | "slightly fast" | "too fast";
+}
+
+export interface VocalVarietyResult {
+  score: number;
+  pitchCoefficientOfVariation: number;
+  volumeCoefficientOfVariation: number;
+}
+
+export interface ConfidenceResult {
+  score: number;
+  explanation: string[];
+}
+
+// --- Tunable thresholds, documented so the scoring is auditable. ---
+
+/** General-purpose target range; Phase 2 will make this mode-specific
+ * (conversational vs. TED-style vs. interview all have different ideal
+ * paces). Sourced from commonly cited public-speaking pace guidance. */
+const IDEAL_WPM_RANGE = { min: 120, max: 160 };
+
+const PAUSE_THRESHOLDS_MS = {
+  /** Below this, it's just natural word spacing, not a "pause". */
+  minGap: 300,
+  /** 300ms-1500ms: a natural breathing/emphasis pause. */
+  longMin: 1500,
+  /** >3000ms: reads as hesitant/awkward rather than deliberate. */
+  awkwardMin: 3000,
+};
+
+const SINGLE_WORD_FILLERS = new Set([
+  "um",
+  "umm",
+  "uh",
+  "uhh",
+  "like",
+  "basically",
+  "literally",
+  "actually",
+]);
+
+const TWO_WORD_FILLERS = new Set(["you know", "sort of", "kind of"]);
+
+function normalizeWord(word: string): string {
+  return word.toLowerCase().replace(/[^a-z']/g, "");
+}
+
+export function calculateWpm(words: WordTimestamp[], durationSeconds: number): number {
+  if (durationSeconds <= 0 || words.length === 0) return 0;
+  return Math.round((words.length / durationSeconds) * 60);
+}
+
+export function scorePace(wpm: number): PaceResult {
+  const { min, max } = IDEAL_WPM_RANGE;
+
+  if (wpm === 0) return { wpm, score: 0, label: "too slow" };
+
+  if (wpm >= min && wpm <= max) {
+    return { wpm, score: 100, label: "ideal" };
+  }
+
+  // Linear falloff outside the ideal range: full points inside the band,
+  // dropping to 0 at 2x the distance from the nearest edge of a
+  // same-sized band beyond it (i.e. by ~80wpm outside the range).
+  const distance = wpm < min ? min - wpm : wpm - max;
+  const falloffRange = max - min || 40;
+  const score = Math.max(0, Math.round(100 - (distance / falloffRange) * 100));
+
+  let label: PaceResult["label"];
+  if (wpm < min) label = distance > falloffRange ? "too slow" : "slightly slow";
+  else label = distance > falloffRange ? "too fast" : "slightly fast";
+
+  return { wpm, score, label };
+}
+
+export function detectFillerWords(words: WordTimestamp[]): FillerOccurrence[] {
+  const occurrences: FillerOccurrence[] = [];
+  let i = 0;
+
+  while (i < words.length) {
+    const current = normalizeWord(words[i].word);
+    const next = words[i + 1] ? normalizeWord(words[i + 1].word) : "";
+    const bigram = `${current} ${next}`;
+
+    if (next && TWO_WORD_FILLERS.has(bigram)) {
+      occurrences.push({ word: bigram, timestampMs: words[i].startMs });
+      i += 2;
+      continue;
+    }
+
+    if (SINGLE_WORD_FILLERS.has(current)) {
+      occurrences.push({ word: current, timestampMs: words[i].startMs });
+    }
+    i += 1;
+  }
+
+  return occurrences;
+}
+
+export function analyzePauses(words: WordTimestamp[]): PauseAnalysis {
+  const pauses: PauseInfo[] = [];
+
+  for (let i = 0; i < words.length - 1; i++) {
+    const gap = words[i + 1].startMs - words[i].endMs;
+    if (gap < PAUSE_THRESHOLDS_MS.minGap) continue;
+
+    const classification: PauseClassification =
+      gap >= PAUSE_THRESHOLDS_MS.awkwardMin
+        ? "awkward"
+        : gap >= PAUSE_THRESHOLDS_MS.longMin
+          ? "long"
+          : "natural";
+
+    pauses.push({ afterWordIndex: i, startMs: words[i].endMs, durationMs: gap, classification });
+  }
+
+  const longPauseCount = pauses.filter((p) => p.classification !== "natural").length;
+  const avgPauseMs =
+    pauses.length === 0 ? 0 : pauses.reduce((sum, p) => sum + p.durationMs, 0) / pauses.length;
+
+  // Score: reward having *some* natural pauses (breath control, emphasis),
+  // penalize a high proportion of long/awkward ones, and penalize having
+  // essentially no pauses at all (rushing, no breath control) on a long take.
+  let score: number;
+  if (pauses.length === 0) {
+    score = words.length > 40 ? 55 : 80; // only meaningfully penalize on longer speech
+  } else {
+    const awkwardRatio = longPauseCount / pauses.length;
+    score = Math.max(0, Math.round(100 - awkwardRatio * 100));
+  }
+
+  return { pauses, pauseCount: pauses.length, longPauseCount, avgPauseMs, score };
+}
+
+function coefficientOfVariation(values: number[]): number {
+  const filtered = values.filter((v) => v > 0);
+  if (filtered.length < 2) return 0;
+  const mean = filtered.reduce((s, v) => s + v, 0) / filtered.length;
+  if (mean === 0) return 0;
+  const variance = filtered.reduce((s, v) => s + (v - mean) ** 2, 0) / filtered.length;
+  return Math.sqrt(variance) / mean;
+}
+
+/** Maps a coefficient of variation to 0-100, peaking in a healthy-variety
+ * band and dropping off toward monotone (too low) or erratic (too high). */
+function scoreCoV(cov: number, idealMin: number, idealMax: number): number {
+  if (cov >= idealMin && cov <= idealMax) return 100;
+  const distance = cov < idealMin ? idealMin - cov : cov - idealMax;
+  const band = idealMax - idealMin || idealMin;
+  return Math.max(0, Math.round(100 - (distance / band) * 100));
+}
+
+export function computeVocalVarietyScore(
+  pitchSamples: AudioSample[],
+  volumeSamples: AudioSample[],
+): VocalVarietyResult {
+  if (pitchSamples.length === 0 && volumeSamples.length === 0) {
+    return { score: 0, pitchCoefficientOfVariation: 0, volumeCoefficientOfVariation: 0 };
+  }
+
+  const pitchCoV = coefficientOfVariation(pitchSamples.map((s) => s.value));
+  const volumeCoV = coefficientOfVariation(volumeSamples.map((s) => s.value));
+
+  const pitchScore = scoreCoV(pitchCoV, 0.12, 0.35);
+  const volumeScore = scoreCoV(volumeCoV, 0.1, 0.4);
+
+  return {
+    score: Math.round(pitchScore * 0.6 + volumeScore * 0.4),
+    pitchCoefficientOfVariation: pitchCoV,
+    volumeCoefficientOfVariation: volumeCoV,
+  };
+}
+
+export function computeClarityScore(words: WordTimestamp[]): number {
+  if (words.length === 0) return 0;
+  const avgConfidence = words.reduce((sum, w) => sum + w.confidence, 0) / words.length;
+  return Math.round(avgConfidence * 100);
+}
+
+export function computeConfidenceScore(input: {
+  paceScore: number;
+  fillerCount: number;
+  wordCount: number;
+  pauseScore: number;
+  vocalVarietyScore: number;
+  pace: PaceResult;
+}): ConfidenceResult {
+  const fillerPer100Words = input.wordCount > 0 ? (input.fillerCount / input.wordCount) * 100 : 0;
+  const fillerScore = Math.max(0, Math.round(100 - fillerPer100Words * 15));
+
+  const score = Math.round(
+    input.paceScore * 0.35 +
+      fillerScore * 0.3 +
+      input.pauseScore * 0.2 +
+      input.vocalVarietyScore * 0.15,
+  );
+
+  const explanation: string[] = [];
+
+  if (input.pace.label === "ideal") {
+    explanation.push(`Your pace (${input.pace.wpm} wpm) was right in the ideal range.`);
+  } else {
+    explanation.push(`Your pace (${input.pace.wpm} wpm) was ${input.pace.label}, which cost you some points.`);
+  }
+
+  if (fillerPer100Words < 1) {
+    explanation.push("You used almost no filler words — very clean delivery.");
+  } else if (fillerPer100Words < 3) {
+    explanation.push(`You used a few filler words (about ${Math.round(fillerPer100Words)} per 100 words).`);
+  } else {
+    explanation.push(`Filler words showed up often (about ${Math.round(fillerPer100Words)} per 100 words), which pulled your score down.`);
+  }
+
+  if (input.pauseScore >= 80) {
+    explanation.push("Your pauses felt natural and controlled.");
+  } else {
+    explanation.push("Several pauses felt long or hesitant rather than deliberate.");
+  }
+
+  if (input.vocalVarietyScore < 50) {
+    explanation.push("Your voice stayed fairly flat, which can read as less engaged.");
+  }
+
+  return { score, explanation };
+}
+
+export function computeOverallScore(scores: {
+  confidenceScore: number;
+  clarityScore: number;
+  paceScore: number;
+  vocalVarietyScore: number;
+}): number {
+  return Math.round(
+    scores.confidenceScore * 0.35 +
+      scores.clarityScore * 0.25 +
+      scores.paceScore * 0.2 +
+      scores.vocalVarietyScore * 0.2,
+  );
+}

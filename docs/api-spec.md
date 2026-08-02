@@ -15,13 +15,14 @@ and `/api/me` — fully generic, see [architecture.md](./architecture.md).
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| POST | `/api/speech/token` | — | Mints a short-lived, scoped Deepgram token server-side. The browser uses this to open a WebSocket directly to Deepgram — our server is never in the audio path. Auth required. |
-| POST | `/api/speech/sessions` | `{ mode, promptText, transcript, durationSeconds, wordTimestamps, pitchSamples, volumeSamples }` | Server recomputes all scores authoritatively (never trusts client-computed numbers), stores the session, calls Claude for coaching feedback, returns the full report. |
+| POST | `/api/speech/sessions` | `{ mode, promptText, transcript, durationSeconds, wordTimestamps, pitchSamples, volumeSamples }` | Server recomputes all scores authoritatively (never trusts client-computed numbers), stores the session, generates rule-based coaching feedback, returns the full report. No external API calls — see [architecture.md](./architecture.md) for why. |
 | GET | `/api/speech/sessions/:id` | — | Fetch one report. 404 if it doesn't belong to the requesting user. |
 
-`wordTimestamps` is `[{ word, startMs, endMs, confidence }]` (from Deepgram).
-`pitchSamples`/`volumeSamples` are `[{ atMs, value }]` from the client's
-`AnalyserNode` sampling.
+`wordTimestamps` is `[{ word, startMs, endMs, confidence }]` — approximated
+client-side from the browser's Speech Recognition API (see
+[architecture.md](./architecture.md)). `pitchSamples`/`volumeSamples` are
+`[{ atMs, value }]` from the client's `AnalyserNode` sampling (a real
+measurement, not approximated).
 
 ## Planned (added per-phase)
 
@@ -29,4 +30,4 @@ and `/api/me` — fully generic, see [architecture.md](./architecture.md).
 - `/api/gamification/*` — Phase 4.
 - `/api/library/*` — Phase 5, speech library/techniques.
 - `/api/exercises/*` — Phase 6.
-- `/api/speech/generate` — Phase 7, AI speech generator via Claude.
+- `/api/speech/generate` — Phase 7, AI speech generator (would require a paid LLM API — revisit budget at that point).

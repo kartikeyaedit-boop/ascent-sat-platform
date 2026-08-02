@@ -30,3 +30,8 @@ export const AuthErrors = {
     new AppError("UNAUTHENTICATED", "You must be logged in to do that.", 401),
   notFound: () => new AppError("NOT_FOUND", "User not found.", 404),
 };
+
+export const SpeechErrors = {
+  sessionNotFound: () =>
+    new AppError("NOT_FOUND", "Session not found.", 404),
+};

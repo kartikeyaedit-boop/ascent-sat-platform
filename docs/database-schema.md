@@ -54,9 +54,9 @@ Notes:
 - `fillerWords` is stored as JSON (`[{ word, timestampMs }]`) rather than a
   child table — it's small, always read as a whole, and never queried
   independently of its session.
-- `CoachingFeedback` is 1:1 with `SpeechSession` (Claude-generated, so it's
-  slower/costlier to produce — kept separate so a session can exist before
-  feedback finishes generating, if that's ever needed).
+- `CoachingFeedback` is 1:1 with `SpeechSession`, kept as a separate table
+  (rather than columns on `SpeechSession`) so a session can exist even if
+  writing its feedback row fails for some reason — see `session.service.ts`.
 
 ## Planned (added per-phase, not yet implemented)
 

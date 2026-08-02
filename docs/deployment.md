@@ -4,8 +4,8 @@
 
 - A PostgreSQL database (Supabase used in development/production so far)
 - The env vars from `apps/web/.env.example`, filled in with real values —
-  including `RESEND_API_KEY` (email) and, from Phase 1 onward,
-  `DEEPGRAM_API_KEY` and `ANTHROPIC_API_KEY`
+  including `RESEND_API_KEY` (email). Speech features need no API keys at
+  all — see [architecture.md](./architecture.md) for why.
 
 ## Vercel (current deploy target)
 
@@ -37,6 +37,3 @@ migrations without prompting or generating new ones.
 ## Secrets
 
 - `JWT_ACCESS_SECRET`: long random value, unique per environment.
-- `DEEPGRAM_API_KEY` / `ANTHROPIC_API_KEY`: server-side only, never exposed
-  to the client. The browser gets a short-lived, scoped Deepgram token
-  minted by `/api/speech/token` — never the permanent key.

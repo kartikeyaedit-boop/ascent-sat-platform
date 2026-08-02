@@ -71,7 +71,7 @@ export default function LoginPage() {
     <Card>
       <CardHeader>
         <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Log in to keep your streak alive.</CardDescription>
+        <CardDescription>Log in to keep practicing.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
