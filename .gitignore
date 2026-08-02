@@ -1,0 +1,50 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.*
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+dist/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env*.local
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# prisma
+apps/web/prisma/migrations/dev.db*
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Local editor/tooling config (personal, machine-specific)
+.claude/
