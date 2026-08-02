@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form";
 import { forgotPasswordSchema } from "@/server/auth/validation";
 import { useForgotPassword } from "@/hooks/use-auth";
+import { ApiClientError } from "@/types/api";
 
 type ForgotPasswordValues = { email: string };
 
@@ -37,8 +38,14 @@ export default function ForgotPasswordPage() {
   });
 
   async function onSubmit(values: ForgotPasswordValues) {
-    await forgotPasswordMutation.mutateAsync(values.email);
-    setSubmitted(true);
+    try {
+      await forgotPasswordMutation.mutateAsync(values.email);
+      setSubmitted(true);
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError ? err.message : "Something went wrong.";
+      form.setError("email", { message });
+    }
   }
 
   if (submitted) {

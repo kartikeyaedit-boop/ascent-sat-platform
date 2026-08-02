@@ -57,8 +57,14 @@ export default function LoginPage() {
 
   async function handleResend() {
     if (!needsVerification) return;
-    await resendMutation.mutateAsync(needsVerification);
-    toast.success("Verification email sent — check your inbox.");
+    try {
+      await resendMutation.mutateAsync(needsVerification);
+      toast.success("Verification email sent — check your inbox.");
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError ? err.message : "Something went wrong.";
+      toast.error(message);
+    }
   }
 
   return (
