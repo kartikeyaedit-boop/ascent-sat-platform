@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { Mic } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-server";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,17 +20,35 @@ export default async function DashboardPage() {
           Welcome back{user ? `, ${user.name.split(" ")[0]}` : ""}
         </h1>
         <p className="text-muted-foreground">
-          Here&apos;s your study snapshot for today.
+          Ready to practice? Every session gives you real, explained feedback.
         </p>
       </div>
 
       <Card>
         <CardHeader>
+          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Mic className="size-6" />
+          </div>
+          <CardTitle className="mt-2">Start a practice session</CardTitle>
+          <CardDescription>
+            Pick a mode, get a prompt, and start speaking — you&apos;ll see
+            live feedback as you go and a full report when you&apos;re done.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link href="/practice">Start practicing</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>More is on the way</CardTitle>
           <CardDescription>
-            You&apos;re logged in and your account is fully set up. XP, streaks,
-            achievements, and practice modules are being built next — this
-            dashboard will come alive as each phase ships.
+            Session history, the speech library, achievements, and analytics
+            are being built next — this dashboard will fill in as each phase
+            ships.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

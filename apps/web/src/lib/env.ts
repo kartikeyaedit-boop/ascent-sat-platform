@@ -15,7 +15,7 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  EMAIL_FROM: z.string().default("SAT Platform <noreply@satplatform.dev>"),
+  EMAIL_FROM: z.string().default("Cadence <noreply@cadence.dev>"),
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),

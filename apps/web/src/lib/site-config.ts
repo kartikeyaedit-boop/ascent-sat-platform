@@ -1,8 +1,8 @@
 export const siteConfig = {
-  name: "Ascent",
-  tagline: "SAT prep that actually feels like a game",
+  name: "Cadence",
+  tagline: "Your AI public speaking coach, available 24/7",
   description:
-    "Ascent is a gamified SAT prep platform with adaptive practice, full-length digital SAT simulations, and an XP-and-achievements system that makes studying something you actually want to do.",
+    "Cadence listens through your microphone and gives you real-time, research-backed feedback on your speaking — confidence, clarity, pace, filler words, and vocal variety — plus personalized coaching after every session.",
   creator: {
     name: "Kartikeya Sharma",
     location: "Concord, North Carolina",

@@ -1,6 +1,7 @@
-// Prisma schema for the SAT Prep Platform.
-// Phase 1 scope: identity & auth only. Gamification, content, practice, social
-// and admin domains are added in later phases (see docs/database-schema.md).
+// Prisma schema for Cadence, an AI public speaking coach.
+// Identity/auth models below are generic and unchanged from the project's
+// earlier form. Speech-domain models are added in prisma/schema.prisma as
+// each phase needs them (see docs/database-schema.md).
 
 generator client {
   provider = "prisma-client-js"

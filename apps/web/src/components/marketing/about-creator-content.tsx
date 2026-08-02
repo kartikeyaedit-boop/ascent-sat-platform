@@ -56,9 +56,9 @@ export function AboutCreatorContent() {
 
         <p className="mt-8 text-lg leading-relaxed text-pretty text-foreground/90">
           This platform was created by {creator.name}, based in{" "}
-          {creator.location}, with the goal of making SAT preparation more
-          engaging, interactive, and enjoyable through modern technology and
-          gamified learning.
+          {creator.location}, with the goal of helping people become more
+          confident, clear communicators by giving them honest, real-time
+          feedback every time they practice speaking.
         </p>
       </motion.div>
     </section>

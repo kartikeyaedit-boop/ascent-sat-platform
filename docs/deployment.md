@@ -1,50 +1,42 @@
 # Deployment Guide
 
-This covers deploying Phase 1 (auth + shell). Later phases don't change the
-deployment shape, just add more env vars as they're introduced.
-
 ## Prerequisites
 
-- A PostgreSQL database reachable from the deploy target (Supabase, Railway
-  Postgres, Neon, RDS, etc.)
-- The env vars from `apps/web/.env.example`, filled in with real values
+- A PostgreSQL database (Supabase used in development/production so far)
+- The env vars from `apps/web/.env.example`, filled in with real values —
+  including `RESEND_API_KEY` (email) and, from Phase 1 onward,
+  `DEEPGRAM_API_KEY` and `ANTHROPIC_API_KEY`
 
-## Option A — Vercel
+## Vercel (current deploy target)
 
-1. Import the repo into Vercel, set the project root to `apps/web`.
-2. Add the environment variables from `.env.example` (`DATABASE_URL`,
-   `DIRECT_URL` if using a pooled Postgres like Supabase, `APP_URL` set to
-   the production URL, `JWT_ACCESS_SECRET` set to a fresh random value, SMTP
-   vars for real email delivery).
-3. Build command: `npm run build` (from `apps/web`). Vercel auto-detects
-   Next.js.
-4. Run `npx prisma migrate deploy` against the production database once
-   (locally with production env vars, or as a one-off Vercel build step)
-   before the first deploy serves traffic.
-
-## Option B — Railway
-
-1. Create a Railway project, add a Postgres plugin (or point `DATABASE_URL`
-   at an external one).
-2. Deploy `apps/web` as a service; Railway can build straight from the
-   Dockerfile (below) or via Nixpacks auto-detection.
-3. Set the same env vars as above.
-4. Run migrations via `railway run npx prisma migrate deploy`.
-
-## Docker
-
-A `Dockerfile` will be added alongside the Phase 10 deployment hardening
-pass. Until then, `npm run build && npm run start` inside `apps/web` is the
-production build/run path for any container or VM host.
+1. Import the repo, project root set to `apps/web`.
+2. **Framework Preset must be "Next.js"** — if Vercel ever auto-detects
+   "Other" (can happen if the first import happens before Root Directory is
+   set correctly), fix it under Settings → General → Framework Settings, or
+   every route will 404 at the platform level even though the build
+   succeeds. This bit us once already.
+3. Root Directory: `apps/web`.
+4. Add all env vars from `.env.example`, with `APP_URL` set to the
+   production domain.
+5. **Email must use Resend's HTTP API (`RESEND_API_KEY`), not SMTP** —
+   outbound SMTP (port 587/465) is blocked on Vercel's serverless
+   functions. `src/server/auth/mailer.ts` already prefers the HTTP API
+   automatically when `RESEND_API_KEY` is set.
+6. Check Settings → Deployment Protection → "Vercel Authentication" is
+   **off** for the domain you want publicly reachable — it's on by default
+   for some plans and will make every route look like a 404 to logged-out
+   visitors.
+7. Run `npx prisma migrate deploy` against production once before serving
+   traffic (or as part of the build if you wire that up later).
 
 ## Database migrations in production
 
-Always use `prisma migrate deploy` (not `migrate dev`) in production/CI — it
-applies existing migrations without generating new ones or prompting.
+Always `prisma migrate deploy` (not `migrate dev`) — applies existing
+migrations without prompting or generating new ones.
 
 ## Secrets
 
-- `JWT_ACCESS_SECRET` must be a long random value, different per environment,
-  and never committed (see `.gitignore`).
-- Rotating it invalidates all existing access tokens (refresh tokens still
-  work and will mint new access tokens on next use).
+- `JWT_ACCESS_SECRET`: long random value, unique per environment.
+- `DEEPGRAM_API_KEY` / `ANTHROPIC_API_KEY`: server-side only, never exposed
+  to the client. The browser gets a short-lived, scoped Deepgram token
+  minted by `/api/speech/token` — never the permanent key.

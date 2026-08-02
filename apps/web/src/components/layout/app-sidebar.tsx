@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
-  Calculator,
+  BookOpenText,
+  History,
   LayoutDashboard,
   Medal,
+  Mic,
   ShoppingBag,
   Sparkles,
-  Trophy,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -25,27 +25,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    enabled: true,
-  },
-  { label: "Math", href: "/math", icon: Calculator, enabled: false },
-  {
-    label: "Reading & Writing",
-    href: "/reading-writing",
-    icon: BarChart3,
-    enabled: false,
-  },
-  {
-    label: "Practice Tests",
-    href: "/practice-tests",
-    icon: Trophy,
-    enabled: false,
-  },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, enabled: true },
+  { label: "Practice", href: "/practice", icon: Mic, enabled: true },
+  { label: "Sessions", href: "/sessions", icon: History, enabled: false },
+  { label: "Speech Library", href: "/library", icon: BookOpenText, enabled: false },
   { label: "Achievements", href: "/achievements", icon: Medal, enabled: false },
-  { label: "Leaderboard", href: "/leaderboard", icon: Users, enabled: false },
   { label: "Store", href: "/store", icon: ShoppingBag, enabled: false },
 ];
 
@@ -64,7 +48,7 @@ export function AppSidebar() {
 
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           if (!item.enabled) {
             return (
               <div

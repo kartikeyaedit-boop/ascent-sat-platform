@@ -16,11 +16,11 @@ export function CtaSection() {
         className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-card px-8 py-14 text-center"
       >
         <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Ready to start leveling up?
+          Ready to hear yourself improve?
         </h2>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground text-pretty">
-          Create a free account and jump into your first practice session in
-          under a minute.
+          Create a free account and get feedback on your first speech in
+          under a minute — just you and your microphone.
         </p>
         <div className="mt-8 flex justify-center">
           <Button size="lg" asChild>

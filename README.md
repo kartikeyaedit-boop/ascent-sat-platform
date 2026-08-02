@@ -1,32 +1,35 @@
-# Ascent — SAT Prep Platform
+# Cadence — AI Public Speaking Coach
 
-A gamified, Khan Academy-inspired SAT prep platform: adaptive practice, full
-digital SAT simulations, XP/levels/streaks/achievements, and deep Math &
-English content. Built in phases — see [docs/roadmap.md](docs/roadmap.md)
-for what's done vs. planned.
+An AI speaking coach that listens through your microphone and gives real,
+explained feedback in real time — confidence, clarity, pace, filler words,
+vocal variety — plus a personalized coaching report after every session.
+Built in phases; see [docs/roadmap.md](docs/roadmap.md) for what's done vs.
+planned.
 
 ## Tech stack
 
 Next.js 15 (App Router) · TypeScript · TailwindCSS · shadcn/ui · Framer
-Motion · React Query · Zustand · Prisma · PostgreSQL · JWT auth
+Motion · React Query · Zustand · Prisma · PostgreSQL · JWT auth · Deepgram
+(live speech-to-text) · Claude (coaching feedback)
 
 ## Project structure
 
 ```
-apps/web/          Next.js app (frontend + API routes)
+apps/web/
   src/app/          Pages & API route handlers
-  src/components/   UI components
-  src/server/       Domain/business logic (service layer)
-  src/lib/          Cross-cutting utilities
-  src/hooks/        React Query hooks
-  src/services/     Typed API client wrappers
-  src/stores/       Zustand stores
+  src/components/   UI, organized by feature (layout, marketing, auth,
+                     practice, reports)
+  src/server/       Domain logic (auth/, speech/)
+  src/lib/          Cross-cutting utilities, incl. speech-metrics.ts
+                     (the scoring math — pure functions, used both
+                     client-side for live scores and server-side as the
+                     source of truth)
+  src/hooks/        React Query hooks + use-speech-session.ts (the
+                     mic → Deepgram → live-metrics state machine)
   prisma/           Schema, migrations, seed script
-  tests/e2e/         Playwright end-to-end tests (unit tests are colocated
-                      with source as *.test.ts)
+  tests/e2e/        Playwright E2E tests (unit tests are colocated with
+                     source as *.test.ts)
 docs/               Architecture, schema, API spec, roadmap, deployment
-docker-compose.yml  Local Postgres (optional — a hosted Postgres like
-                     Supabase works too, see below)
 ```
 
 ## Getting started
@@ -40,19 +43,18 @@ npm install
 
 ### 2. Set up the database
 
-You need a PostgreSQL database. Either:
-
-- **Local via Docker**: `docker compose up -d` from the repo root, then use
-  the `DATABASE_URL` already in `.env.example` (matches the compose file).
-- **Hosted (e.g. Supabase free tier)**: create a project, grab the pooled
-  connection string for `DATABASE_URL` and the direct connection string for
-  `DIRECT_URL` (Project → Connect → ORM → Prisma in the Supabase dashboard).
-
 Copy the env file and fill in your values:
 
 ```bash
 cp .env.example .env
 ```
+
+You need a PostgreSQL connection string (`DATABASE_URL`/`DIRECT_URL` —
+Supabase's pooled + direct connection strings work well), a
+`JWT_ACCESS_SECRET`, and a `RESEND_API_KEY` for real email delivery
+(optional in dev — without it, verification/reset emails are logged to the
+console instead of sent). From Phase 1 onward you'll also need
+`DEEPGRAM_API_KEY` and `ANTHROPIC_API_KEY`.
 
 Then run the migration and seed script:
 
@@ -61,7 +63,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-The seed script creates two accounts (email-verified, ready to log in):
+Seed creates two email-verified accounts:
 
 | Role | Email | Password |
 |---|---|---|
@@ -76,9 +78,6 @@ npm run dev
 
 Visit http://localhost:3000.
 
-In development, no SMTP is required — verification/reset emails are logged
-to the server console instead of actually being sent.
-
 ## Scripts (run from `apps/web`)
 
 | Command | What it does |
@@ -88,22 +87,16 @@ to the server console instead of actually being sent.
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` | Vitest unit tests |
-| `npm run test:e2e` | Playwright E2E tests (starts its own dev server) |
+| `npm run test:e2e` | Playwright E2E tests (builds + starts its own prod server) |
 | `npm run db:migrate` | Run Prisma migrations (dev) |
-| `npm run db:seed` | Seed the admin + demo student accounts |
+| `npm run db:seed` | Seed demo accounts |
 | `npm run db:studio` | Open Prisma Studio |
-
-## Environment variables
-
-See [`apps/web/.env.example`](apps/web/.env.example) for the full list with
-descriptions.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md)
+- [Architecture](docs/architecture.md) — including how live audio feedback
+  works on a serverless platform
 - [Database schema](docs/database-schema.md)
 - [API specification](docs/api-spec.md)
 - [Roadmap](docs/roadmap.md)
 - [Deployment guide](docs/deployment.md)
-
-

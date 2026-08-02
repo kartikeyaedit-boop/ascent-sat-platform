@@ -2,50 +2,50 @@
 
 import { motion } from "framer-motion";
 import {
+  AudioLines,
   BarChart3,
-  BookOpenCheck,
-  Gamepad2,
+  MessageSquareText,
+  Mic,
   ShieldCheck,
   Sparkles,
-  Timer,
 } from "lucide-react";
 
 const features = [
   {
-    icon: Gamepad2,
-    title: "XP, levels & streaks",
+    icon: Mic,
+    title: "Live feedback while you speak",
     description:
-      "Every correct answer, finished lesson, and daily login earns XP. Level up to unlock cosmetics, titles, and themes.",
+      "See your pace, filler words, and confidence score update in real time as you talk — not just after you're done.",
   },
   {
-    icon: BookOpenCheck,
-    title: "Deep Math & English content",
+    icon: MessageSquareText,
+    title: "Coaching that explains itself",
     description:
-      "Dozens of topics across Algebra, Geometry, Statistics, Reading, and Writing & Grammar — built to mirror the real digital SAT.",
+      "Every score comes with a reason. We'll never just say 'confidence: 62' — you'll know exactly what pulled it up or down.",
   },
   {
-    icon: Timer,
-    title: "Full digital SAT simulations",
+    icon: AudioLines,
+    title: "Vocal variety tracking",
     description:
-      "Timed, sectioned practice tests with flagging, pausing, and review mode, scored with an estimated SAT score.",
-  },
-  {
-    icon: BarChart3,
-    title: "Real analytics",
-    description:
-      "See your accuracy by topic, your weakest skills, and how your estimated score is trending over time.",
+      "Pitch, volume, and energy tracked throughout your speech, so you can catch monotone delivery before your audience does.",
   },
   {
     icon: Sparkles,
-    title: "Adaptive practice",
+    title: "Research-backed techniques",
     description:
-      "Practice sessions adjust to focus on the topics you're actually weak on, not the ones you've already mastered.",
+      "Learn and practice real communication frameworks — the Rule of Three, PREP, Monroe's Motivated Sequence — with guided drills.",
+  },
+  {
+    icon: BarChart3,
+    title: "Progress you can see",
+    description:
+      "Track confidence, clarity, and pace across every session, so improvement isn't just a feeling — it's a graph.",
   },
   {
     icon: ShieldCheck,
-    title: "No pay-to-win",
+    title: "Your recordings, your control",
     description:
-      "Coins buy cosmetics — avatars, themes, effects. Every question, lesson, and practice test is free.",
+      "Clear on what's stored versus processed live, with full deletion of any recording or transcript whenever you want.",
   },
 ];
 
@@ -60,11 +60,11 @@ export function Features() {
         className="mx-auto max-w-2xl text-center"
       >
         <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Everything you need, none of the boredom
+          A speaking coach that&apos;s always available
         </h2>
         <p className="mt-3 text-muted-foreground text-pretty">
-          Built like the products you already open every day, not a stale
-          textbook website.
+          No scheduling, no judgment — just practice, real feedback, and a
+          clear path to getting better.
         </p>
       </motion.div>
 

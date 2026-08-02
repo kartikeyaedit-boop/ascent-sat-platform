@@ -1,76 +1,75 @@
 # Database Schema
 
 Schema lives at [`apps/web/prisma/schema.prisma`](../apps/web/prisma/schema.prisma).
-This document tracks the *full* intended schema across all phases — only the
-Phase 1 tables exist today; the rest are added in the phase that needs them
-(see [roadmap.md](./roadmap.md)) so the schema never has dead, unused tables.
 
-## Phase 1 (implemented)
+## Identity (unchanged from before the pivot)
+
+`User`, `RefreshToken`, `EmailVerificationToken`, `PasswordResetToken` —
+fully generic auth tables, no changes needed for the new product. See
+[architecture.md](./architecture.md) for the auth model.
+
+## Speech domain (Phase 1)
 
 ```mermaid
 erDiagram
-    User ||--o{ RefreshToken : has
-    User ||--o{ EmailVerificationToken : has
-    User ||--o{ PasswordResetToken : has
+    User ||--o{ SpeechSession : has
+    SpeechSession ||--o| CoachingFeedback : has
 
-    User {
+    SpeechSession {
         string id PK
-        string email UK
-        string passwordHash
-        string name
-        string avatarUrl
-        enum role
-        boolean emailVerified
+        string userId FK
+        string mode
+        string promptText
+        string transcript
+        int durationSeconds
+        float wpm
+        json fillerWords
+        int pauseCount
+        int longPauseCount
+        float avgPauseMs
+        int confidenceScore
+        int clarityScore
+        int paceScore
+        int vocalVarietyScore
+        int overallScore
         datetime createdAt
-        datetime updatedAt
     }
-    RefreshToken {
+    CoachingFeedback {
         string id PK
-        string userId FK
-        string tokenHash UK
-        datetime expiresAt
-        datetime revokedAt
-    }
-    EmailVerificationToken {
-        string id PK
-        string userId FK
-        string tokenHash UK
-        datetime expiresAt
-    }
-    PasswordResetToken {
-        string id PK
-        string userId FK
-        string tokenHash UK
-        datetime expiresAt
-        datetime usedAt
+        string sessionId FK
+        json strengths
+        json weaknesses
+        json actionPlan
+        json practiceDrills
+        string motivationalNote
+        datetime createdAt
     }
 ```
 
 Notes:
-- Only *hashes* of refresh/verification/reset tokens are stored — the raw
-  value is only ever known by the user (in the URL/cookie), never persisted.
-- `RefreshToken.revokedAt` implements rotation: a token is marked revoked the
-  moment it's used to mint a new one, or on logout / password reset.
+- All scores are computed server-side by `src/lib/speech-metrics.ts` from
+  the submitted transcript + timestamps — never trusted from the client
+  directly, even though the client computes the same numbers live for
+  in-progress display.
+- `fillerWords` is stored as JSON (`[{ word, timestampMs }]`) rather than a
+  child table — it's small, always read as a whole, and never queried
+  independently of its session.
+- `CoachingFeedback` is 1:1 with `SpeechSession` (Claude-generated, so it's
+  slower/costlier to produce — kept separate so a session can exist before
+  feedback finishes generating, if that's ever needed).
 
 ## Planned (added per-phase, not yet implemented)
 
-- **Phase 2 — Gamification**: `XPLog`, `CoinLog`, `Level` (config), `Streak`,
-  `Achievement`, `UserAchievement`, `DailyQuest`, `UserDailyQuest`,
-  `WeeklyQuest`, `ShopItem`, `Purchase`, `Inventory`, `Notification`.
-- **Phase 3/4 — Content**: `Subject`, `Module`, `Topic`, `Subtopic`, `Lesson`,
-  `Question`, `QuestionChoice`, `QuestionTag`.
-- **Phase 3/4 — Practice**: `PracticeSession`, `PracticeAnswer`.
-- **Phase 5 — Practice tests**: `Test`, `TestSection`, `TestAttempt`,
-  `TestAttemptAnswer`.
-- **Phase 6 — Analytics**: `UserTopicMastery`, `AnalyticsSnapshot`.
-- **Phase 7 — Social**: `Friendship`, `FriendRequest`, `Message`.
-- **Phase 8 — Admin**: no new tables — gated by `User.role === ADMIN`.
+- **Phase 2 — Practice modes**: mode metadata, `SpeechPrompt` (library of
+  prompts per mode, or AI-generated on demand).
+- **Phase 4 — Gamification**: `XPLog`, `CoinLog`, `Streak`, `Achievement`,
+  `UserAchievement`, `ShopItem`, `Purchase` — same pattern designed for the
+  (abandoned) SAT platform, ported over conceptually.
+- **Phase 5 — Speech library**: `Technique` (Rule of Three, PREP, etc.),
+  `ExampleSpeech` (curated excerpts, technique-focused).
+- **Phase 6 — Daily exercises**: `Exercise`, `DailyExercise`.
 
 ## Conventions
 
-- IDs: `cuid()` everywhere (sortable-ish, collision-resistant, no
-  coordination needed — good fit for a single-writer Postgres setup).
-- Table names are `snake_case` via `@@map`; Prisma model names stay
-  `PascalCase`.
-- Every foreign key has an index; cascading deletes are used for
-  strictly-owned child rows (e.g. a user's tokens).
+Unchanged: `cuid()` IDs, `snake_case` table names via `@@map`, indexed
+foreign keys, cascading deletes for strictly-owned child rows.
