@@ -143,12 +143,20 @@ describe("computeVocalVarietyScore", () => {
 });
 
 describe("computeClarityScore", () => {
-  it("reflects average per-word STT confidence as a 0-100 score", () => {
-    const words = [word("a", 0, 100, 0.9), word("b", 100, 200, 0.8)];
-    expect(computeClarityScore(words)).toBe(85);
+  it("scores 100 when the average presence-band ratio is in the ideal range", () => {
+    const samples = [
+      { atMs: 0, value: 0.2 },
+      { atMs: 150, value: 0.25 },
+    ];
+    expect(computeClarityScore(samples)).toBe(100);
   });
 
-  it("returns 0 for no words", () => {
+  it("scores lower for a ratio outside the ideal range (too little presence energy)", () => {
+    const samples = [{ atMs: 0, value: 0.02 }];
+    expect(computeClarityScore(samples)).toBeLessThan(100);
+  });
+
+  it("returns 0 for no samples (e.g. a session with only silence)", () => {
     expect(computeClarityScore([])).toBe(0);
   });
 });

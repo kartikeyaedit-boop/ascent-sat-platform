@@ -8,7 +8,7 @@ import {
   type WordTimestamp,
   type AudioSample,
 } from "@/lib/speech-metrics";
-import { computeRms, detectPitch } from "@/lib/audio-analysis";
+import { computeRms, detectPitch, computeSpectralClarity, SILENCE_RMS_THRESHOLD } from "@/lib/audio-analysis";
 import { createSpeechSession } from "@/services/speech";
 
 export type SpeechSessionStatus =
@@ -93,6 +93,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
   const finalWordsRef = useRef<WordTimestamp[]>([]);
   const pitchSamplesRef = useRef<AudioSample[]>([]);
   const volumeSamplesRef = useRef<AudioSample[]>([]);
+  const claritySamplesRef = useRef<AudioSample[]>([]);
 
   const cleanup = useCallback(() => {
     shouldBeRecordingRef.current = false;
@@ -124,6 +125,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
     finalWordsRef.current = [];
     pitchSamplesRef.current = [];
     volumeSamplesRef.current = [];
+    claritySamplesRef.current = [];
     lastChunkEndMsRef.current = 0;
     setInterimText("");
     setLiveWpm(0);
@@ -223,13 +225,28 @@ export function useSpeechSession(mode: string, promptText?: string) {
       source.connect(analyser);
 
       const timeDomainBuffer = new Float32Array(analyser.fftSize);
+      const frequencyBuffer = new Float32Array(analyser.frequencyBinCount);
 
       analysisIntervalRef.current = setInterval(() => {
         analyser.getFloatTimeDomainData(timeDomainBuffer);
         const atMs = Date.now() - startTimeRef.current;
-        volumeSamplesRef.current.push({ atMs, value: computeRms(timeDomainBuffer) });
+        const rms = computeRms(timeDomainBuffer);
+        volumeSamplesRef.current.push({ atMs, value: rms });
         const pitch = detectPitch(timeDomainBuffer, audioContext.sampleRate);
         if (pitch > 0) pitchSamplesRef.current.push({ atMs, value: pitch });
+
+        // Only sample clarity while there's actual signal — during silence
+        // the spectrum is just noise floor, and averaging that in would
+        // pollute a real measurement with meaningless readings.
+        if (rms >= SILENCE_RMS_THRESHOLD) {
+          analyser.getFloatFrequencyData(frequencyBuffer);
+          const clarity = computeSpectralClarity(
+            frequencyBuffer,
+            audioContext.sampleRate,
+            analyser.fftSize,
+          );
+          claritySamplesRef.current.push({ atMs, value: clarity });
+        }
       }, ANALYSIS_INTERVAL_MS);
 
       timerIntervalRef.current = setInterval(() => {
@@ -307,6 +324,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
         wordTimestamps: finalWordsRef.current,
         pitchSamples: pitchSamplesRef.current,
         volumeSamples: volumeSamplesRef.current,
+        claritySamples: claritySamplesRef.current,
       });
       router.push(`/sessions/${session.id}`);
     } catch (err) {

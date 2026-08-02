@@ -20,4 +20,5 @@ export const createSessionSchema = z.object({
   wordTimestamps: z.array(wordTimestampSchema),
   pitchSamples: z.array(audioSampleSchema),
   volumeSamples: z.array(audioSampleSchema),
+  claritySamples: z.array(audioSampleSchema),
 });

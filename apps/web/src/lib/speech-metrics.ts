@@ -6,12 +6,19 @@
  * trusted directly, see POST /api/speech/sessions). Same math, one source
  * of truth, so live and final scores never disagree.
  *
- * Every score here comes from a real measured signal — word timings and
- * per-word confidence from the speech-to-text engine, and pitch/volume
- * sampled from the Web Audio API — combined via a documented, explainable
- * formula. None of it is a trained ML model: there's no labeled training
- * data to train one on, and a black-box score would violate the product's
- * core promise of always explaining *why* a score is what it is.
+ * Every score here comes from a real measured signal — word timings from
+ * speech recognition, and pitch/volume/spectral-clarity sampled directly
+ * from the Web Audio API — combined via a documented, explainable formula.
+ * None of it is a trained ML model: there's no labeled training data to
+ * train one on, and a black-box score would violate the product's core
+ * promise of always explaining *why* a score is what it is.
+ *
+ * Clarity specifically used to come from the speech-to-text engine's
+ * per-word confidence, but browsers (Chrome in particular) frequently just
+ * don't populate that field — it silently fell back to a constant and
+ * stopped measuring anything. It now comes from real-time spectral
+ * analysis instead (see computeClarityScore below), which is always a
+ * genuine measurement.
  */
 
 export interface WordTimestamp {
@@ -195,11 +202,12 @@ function coefficientOfVariation(values: number[]): number {
   return Math.sqrt(variance) / mean;
 }
 
-/** Maps a coefficient of variation to 0-100, peaking in a healthy-variety
- * band and dropping off toward monotone (too low) or erratic (too high). */
-function scoreCoV(cov: number, idealMin: number, idealMax: number): number {
-  if (cov >= idealMin && cov <= idealMax) return 100;
-  const distance = cov < idealMin ? idealMin - cov : cov - idealMax;
+/** Maps a value to 0-100, peaking in a healthy target band and dropping
+ * off on either side (e.g. a coefficient of variation that's healthiest
+ * in the middle — too low reads as monotone, too high as erratic). */
+export function scoreInBand(value: number, idealMin: number, idealMax: number): number {
+  if (value >= idealMin && value <= idealMax) return 100;
+  const distance = value < idealMin ? idealMin - value : value - idealMax;
   const band = idealMax - idealMin || idealMin;
   return Math.max(0, Math.round(100 - (distance / band) * 100));
 }
@@ -215,8 +223,8 @@ export function computeVocalVarietyScore(
   const pitchCoV = coefficientOfVariation(pitchSamples.map((s) => s.value));
   const volumeCoV = coefficientOfVariation(volumeSamples.map((s) => s.value));
 
-  const pitchScore = scoreCoV(pitchCoV, 0.12, 0.35);
-  const volumeScore = scoreCoV(volumeCoV, 0.1, 0.4);
+  const pitchScore = scoreInBand(pitchCoV, 0.12, 0.35);
+  const volumeScore = scoreInBand(volumeCoV, 0.1, 0.4);
 
   return {
     score: Math.round(pitchScore * 0.6 + volumeScore * 0.4),
@@ -225,10 +233,23 @@ export function computeVocalVarietyScore(
   };
 }
 
-export function computeClarityScore(words: WordTimestamp[]): number {
-  if (words.length === 0) return 0;
-  const avgConfidence = words.reduce((sum, w) => sum + w.confidence, 0) / words.length;
-  return Math.round(avgConfidence * 100);
+/** Ideal fraction of energy in the 2-8kHz "presence" band (see
+ * computeSpectralClarity in audio-analysis.ts) — a starting calibration
+ * based on typical speech spectra, not yet tuned against real usage data. */
+const CLARITY_RATIO_RANGE = { min: 0.12, max: 0.35 };
+
+/**
+ * Clarity from real-time spectral analysis of the mic input (see
+ * computeSpectralClarity in audio-analysis.ts) — how much high-frequency
+ * "presence" energy (crisp consonants) was present relative to the full
+ * speech band, averaged across the session. A genuine acoustic
+ * measurement every time, unlike speech-to-text confidence (see the
+ * module docstring above for why that was replaced).
+ */
+export function computeClarityScore(claritySamples: AudioSample[]): number {
+  if (claritySamples.length === 0) return 0;
+  const avgRatio = claritySamples.reduce((sum, s) => sum + s.value, 0) / claritySamples.length;
+  return scoreInBand(avgRatio, CLARITY_RATIO_RANGE.min, CLARITY_RATIO_RANGE.max);
 }
 
 export function computeConfidenceScore(input: {

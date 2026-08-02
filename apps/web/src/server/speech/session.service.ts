@@ -23,6 +23,7 @@ export interface CreateSessionInput {
   wordTimestamps: WordTimestamp[];
   pitchSamples: AudioSample[];
   volumeSamples: AudioSample[];
+  claritySamples: AudioSample[];
 }
 
 /**
@@ -37,7 +38,7 @@ export async function createSession(input: CreateSessionInput) {
   const fillerWords = detectFillerWords(input.wordTimestamps);
   const pauseAnalysis = analyzePauses(input.wordTimestamps);
   const vocalVariety = computeVocalVarietyScore(input.pitchSamples, input.volumeSamples);
-  const clarityScore = computeClarityScore(input.wordTimestamps);
+  const clarityScore = computeClarityScore(input.claritySamples);
 
   const confidence = computeConfidenceScore({
     paceScore: pace.score,

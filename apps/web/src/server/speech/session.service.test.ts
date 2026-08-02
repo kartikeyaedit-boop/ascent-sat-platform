@@ -35,6 +35,7 @@ const baseInput = {
   wordTimestamps: words(),
   pitchSamples: [],
   volumeSamples: [],
+  claritySamples: [],
 };
 
 beforeEach(() => {

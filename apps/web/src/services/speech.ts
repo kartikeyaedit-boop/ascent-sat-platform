@@ -39,6 +39,7 @@ export interface CreateSpeechSessionInput {
   wordTimestamps: WordTimestamp[];
   pitchSamples: AudioSample[];
   volumeSamples: AudioSample[];
+  claritySamples: AudioSample[];
 }
 
 export function createSpeechSession(input: CreateSpeechSessionInput) {
