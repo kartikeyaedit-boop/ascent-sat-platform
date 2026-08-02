@@ -247,9 +247,55 @@ export function useSpeechSession(mode: string, promptText?: string) {
   }, [cleanup]);
 
   const stop = useCallback(async () => {
-    const durationSeconds = Math.max(1, (Date.now() - startTimeRef.current) / 1000);
-    cleanup();
+    // Lock the UI immediately so a second click can't fire a concurrent
+    // stop() while we're waiting below (the recording button stays visible/
+    // enabled until status changes).
     setStatus("submitting");
+
+    // Calling recognition.stop() doesn't finalize instantly — the browser
+    // still needs to deliver one last onresult for whatever was mid-phrase
+    // when the user clicked stop. Reading finalWordsRef before that arrives
+    // silently drops the tail of the recording (often most of it, if the
+    // user never paused). Wait for onend (fires after final results are
+    // delivered) before touching finalWordsRef, with a timeout as a safety
+    // net in case onend never fires for some reason.
+    shouldBeRecordingRef.current = false;
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const recognition = recognitionRef.current;
+      if (recognition) {
+        recognition.onend = finish;
+        recognition.stop();
+      } else {
+        finish();
+      }
+      setTimeout(finish, 1500);
+    });
+
+    const durationSeconds = Math.max(1, (Date.now() - startTimeRef.current) / 1000);
+
+    // Fallback: some browsers can end a session without ever finalizing a
+    // result (e.g. stopped almost immediately after starting). Rather than
+    // silently submitting "no speech detected" when the user was clearly
+    // seen talking (interim text existed), spread the last interim text
+    // evenly across the recording as a last-resort estimate.
+    if (finalWordsRef.current.length === 0 && interimText.trim()) {
+      const words = interimText.trim().split(/\s+/).filter(Boolean);
+      const spanMs = Math.max(1, Date.now() - startTimeRef.current);
+      finalWordsRef.current = words.map((word, idx) => ({
+        word,
+        startMs: Math.round((idx / words.length) * spanMs),
+        endMs: Math.round(((idx + 1) / words.length) * spanMs),
+        confidence: FALLBACK_WORD_CONFIDENCE,
+      }));
+    }
+
+    cleanup();
 
     try {
       const transcript = finalWordsRef.current.map((w) => w.word).join(" ");
@@ -269,7 +315,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
         err instanceof Error ? err.message : "Couldn't save your session.",
       );
     }
-  }, [cleanup, mode, promptText, router]);
+  }, [cleanup, interimText, mode, promptText, router]);
 
   return {
     status,
