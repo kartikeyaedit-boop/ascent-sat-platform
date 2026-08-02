@@ -8,13 +8,11 @@ interface SendEmailInput {
   text: string;
 }
 
-let transporter: Transporter | null = null;
-
 /**
- * In dev/test (no SMTP configured), the last email sent to each address is
- * kept in memory so E2E tests can retrieve verification/reset links without
- * needing a real inbox. Exposed only via a route guarded to non-production
- * environments — see /api/test/last-email.
+ * In dev/test (no email provider configured), the last email sent to each
+ * address is kept in memory so E2E tests can retrieve verification/reset
+ * links without needing a real inbox. Exposed only via a route guarded by
+ * ENABLE_TEST_ENDPOINTS — see /api/test/last-email.
  */
 const lastEmailByRecipient = new Map<string, SendEmailInput>();
 
@@ -22,44 +20,65 @@ export function getLastEmail(to: string): SendEmailInput | undefined {
   return lastEmailByRecipient.get(to);
 }
 
-function getTransporter(): Transporter {
-  if (transporter) return transporter;
+async function sendViaResendApi(input: SendEmailInput): Promise<void> {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: env.EMAIL_FROM,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    }),
+  });
 
-  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD) {
-    transporter = nodemailer.createTransport({
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Resend API error (${response.status}): ${body}`);
+  }
+}
+
+let smtpTransporter: Transporter | null = null;
+
+function getSmtpTransporter(): Transporter {
+  if (!smtpTransporter) {
+    smtpTransporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT ?? 587,
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
     });
-  } else {
-    // Development fallback: no real SMTP configured, so emails are logged
-    // to the server console instead of being sent.
-    transporter = nodemailer.createTransport({ jsonTransport: true });
   }
-
-  return transporter;
+  return smtpTransporter;
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<void> {
-  const usingRealSmtp = Boolean(
-    env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD,
-  );
-  const info = await getTransporter().sendMail({
-    from: env.EMAIL_FROM,
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  });
-
-  if (!usingRealSmtp) {
-    lastEmailByRecipient.set(input.to, input);
-    console.log(
-      `\n[dev email] To: ${input.to}\nSubject: ${input.subject}\n${input.text}\n`,
-      info.messageId,
-    );
+  // Preferred: Resend's HTTP API. Outbound SMTP (port 587/465) is blocked
+  // on most serverless platforms (including Vercel), so SMTP only works
+  // for local/non-serverless runs.
+  if (env.RESEND_API_KEY) {
+    await sendViaResendApi(input);
+    return;
   }
+
+  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD) {
+    await getSmtpTransporter().sendMail({
+      from: env.EMAIL_FROM,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+    return;
+  }
+
+  // Development fallback: no provider configured, log instead of sending.
+  lastEmailByRecipient.set(input.to, input);
+  console.log(`\n[dev email] To: ${input.to}\nSubject: ${input.subject}\n${input.text}\n`);
 }
 
 export function verificationEmail(link: string) {
