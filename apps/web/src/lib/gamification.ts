@@ -67,9 +67,17 @@ export function calculateSessionXp(overallScore: number): number {
   return base + bonus;
 }
 
+/**
+ * Coins for completing a session: 40-120 depending on score (avg ~80 for a
+ * decent session). Calibrated against the store's price curve (see
+ * shop-items.ts) so a daily practicer clears the common tier in days, rare
+ * in a couple of weeks, epic in a month or two, and the legendary tier
+ * (10k-15k coins) in roughly 100-200 sessions — a real grind, but months,
+ * not years.
+ */
 export function calculateSessionCoins(overallScore: number): number {
-  const base = 5;
-  const bonus = Math.round((Math.max(0, Math.min(100, overallScore)) / 100) * 10);
+  const base = 40;
+  const bonus = Math.round((Math.max(0, Math.min(100, overallScore)) / 100) * 80);
   return base + bonus;
 }
 

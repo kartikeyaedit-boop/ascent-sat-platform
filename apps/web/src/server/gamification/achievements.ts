@@ -46,7 +46,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete your first practice session.",
     icon: "Footprints",
     xpReward: 20,
-    coinReward: 10,
+    coinReward: 80,
     // >= rather than === : an account with pre-existing sessions from
     // before an achievement existed would otherwise sail past the exact
     // count and never unlock it. Safe because checkNewlyUnlockedAchievements
@@ -59,7 +59,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete 5 practice sessions.",
     icon: "Flame",
     xpReward: 30,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.stats.totalSessions >= 5,
   },
   {
@@ -68,7 +68,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete 25 practice sessions.",
     icon: "Award",
     xpReward: 75,
-    coinReward: 40,
+    coinReward: 320,
     check: (ctx) => ctx.stats.totalSessions >= 25,
   },
   {
@@ -77,7 +77,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete 100 practice sessions.",
     icon: "Trophy",
     xpReward: 200,
-    coinReward: 100,
+    coinReward: 800,
     check: (ctx) => ctx.stats.totalSessions >= 100,
   },
   {
@@ -86,7 +86,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Score a perfect 100 overall on a session.",
     icon: "Star",
     xpReward: 100,
-    coinReward: 50,
+    coinReward: 400,
     check: (ctx) => ctx.session.overallScore === 100,
   },
   {
@@ -95,7 +95,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Score 90 or higher overall on a session.",
     icon: "Sparkles",
     xpReward: 40,
-    coinReward: 20,
+    coinReward: 160,
     check: (ctx) => ctx.session.overallScore >= 90,
   },
   {
@@ -104,7 +104,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Beat your previous best overall score.",
     icon: "TrendingUp",
     xpReward: 25,
-    coinReward: 10,
+    coinReward: 80,
     check: (ctx) => ctx.stats.totalSessions > 1 && ctx.session.overallScore >= ctx.stats.bestOverallScore,
   },
   {
@@ -113,7 +113,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete a session of at least 30 seconds with zero filler words.",
     icon: "Gem",
     xpReward: 40,
-    coinReward: 20,
+    coinReward: 160,
     check: (ctx) => ctx.session.fillerWordCount === 0 && ctx.session.durationSeconds >= 30,
   },
   {
@@ -122,7 +122,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Practice 3 days in a row.",
     icon: "Zap",
     xpReward: 25,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.stats.currentStreak >= 3,
   },
   {
@@ -131,7 +131,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Practice 7 days in a row.",
     icon: "CalendarCheck",
     xpReward: 60,
-    coinReward: 30,
+    coinReward: 240,
     check: (ctx) => ctx.stats.currentStreak >= 7,
   },
   {
@@ -140,7 +140,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Practice 30 days in a row.",
     icon: "Rocket",
     xpReward: 300,
-    coinReward: 150,
+    coinReward: 1200,
     check: (ctx) => ctx.stats.currentStreak >= 30,
   },
   {
@@ -149,7 +149,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Land a perfect pace score on a session.",
     icon: "Gauge",
     xpReward: 30,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.session.paceScore === 100,
   },
   {
@@ -158,7 +158,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Score 90 or higher on vocal variety.",
     icon: "AudioLines",
     xpReward: 30,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.session.vocalVarietyScore >= 90,
   },
   {
@@ -167,7 +167,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Score 90 or higher on clarity.",
     icon: "Radio",
     xpReward: 30,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.session.clarityScore >= 90,
   },
   {
@@ -176,7 +176,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Score 90 or higher on confidence.",
     icon: "Crown",
     xpReward: 30,
-    coinReward: 15,
+    coinReward: 120,
     check: (ctx) => ctx.session.confidenceScore >= 90,
   },
   {
@@ -185,7 +185,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: "Complete a session lasting 5 minutes or more.",
     icon: "Timer",
     xpReward: 40,
-    coinReward: 20,
+    coinReward: 160,
     check: (ctx) => ctx.session.durationSeconds >= 300,
   },
 ];

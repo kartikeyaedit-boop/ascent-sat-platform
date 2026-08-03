@@ -58,8 +58,8 @@ describe("calculateSessionXp", () => {
 
 describe("calculateSessionCoins", () => {
   it("awards base coins for a 0 score and max for a perfect score", () => {
-    expect(calculateSessionCoins(0)).toBe(5);
-    expect(calculateSessionCoins(100)).toBe(15);
+    expect(calculateSessionCoins(0)).toBe(40);
+    expect(calculateSessionCoins(100)).toBe(120);
   });
 });
 
