@@ -48,8 +48,8 @@ async function main() {
   for (const item of SHOP_ITEMS) {
     await prisma.shopItem.upsert({
       where: { key: item.key },
-      update: { name: item.name, price: item.price },
-      create: { key: item.key, name: item.name, price: item.price },
+      update: { name: item.name, category: item.category, emoji: item.emoji, rarity: item.rarity, price: item.price },
+      create: { key: item.key, name: item.name, category: item.category, emoji: item.emoji, rarity: item.rarity, price: item.price },
     });
   }
   console.log(`Seeded ${ACHIEVEMENTS.length} achievements and ${SHOP_ITEMS.length} shop items.`);

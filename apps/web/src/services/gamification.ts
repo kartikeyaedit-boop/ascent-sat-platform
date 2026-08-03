@@ -10,6 +10,7 @@ export interface GamificationSummary {
   currentStreak: number;
   longestStreak: number;
   equippedTitle: string | null;
+  equippedPet: { name: string; emoji: string } | null;
 }
 
 export interface AchievementListItem {
@@ -23,9 +24,15 @@ export interface AchievementListItem {
   unlockedAt: string | null;
 }
 
+export type ShopItemCategory = "TITLE" | "PET";
+export type ShopItemRarity = "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
+
 export interface ShopListItem {
   key: string;
   name: string;
+  category: ShopItemCategory;
+  emoji: string;
+  rarity: ShopItemRarity;
   price: number;
   owned: boolean;
   equipped: boolean;
@@ -51,14 +58,15 @@ export function purchaseShopItem(key: string) {
 }
 
 export function equipShopItem(key: string) {
-  return apiFetch<{ equippedTitle: string }>("/api/gamification/shop/equip", {
+  return apiFetch<{ name: string; category: ShopItemCategory }>("/api/gamification/shop/equip", {
     method: "POST",
     body: { key },
   });
 }
 
-export function unequipShopItem() {
-  return apiFetch<{ equippedTitle: null }>("/api/gamification/shop/unequip", {
+export function unequipShopItem(category: ShopItemCategory) {
+  return apiFetch<{ category: ShopItemCategory }>("/api/gamification/shop/unequip", {
     method: "POST",
+    body: { category },
   });
 }

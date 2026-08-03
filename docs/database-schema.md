@@ -96,6 +96,9 @@ erDiagram
         string id PK
         string key UK
         string name
+        string category "TITLE | PET"
+        string emoji
+        string rarity "COMMON | RARE | EPIC | LEGENDARY"
         int price
     }
     Purchase {
@@ -109,12 +112,19 @@ erDiagram
 
 Notes:
 - `User` gained `xp`, `coins`, `currentStreak`, `longestStreak`,
-  `lastPracticeDate`, `equippedTitleId` — level is always *derived* from
-  `xp` (see `calculateLevel` in `src/lib/gamification.ts`), never stored,
-  so it can't drift out of sync.
-- `Achievement` and `ShopItem` are lazily upserted from static catalogs in
-  code (`src/server/gamification/achievements.ts`,
-  `.../shop-items.ts`) the first time each one unlocks/is purchased — the
+  `lastPracticeDate`, `equippedTitleId`, `equippedPetId` — level is always
+  *derived* from `xp` (see `calculateLevel` in `src/lib/gamification.ts`),
+  never stored, so it can't drift out of sync.
+- `ShopItem.category` splits the catalog into `TITLE` (profile title
+  badges) and `PET` (collectible companions) — the two are equipped into
+  separate `User` columns/relations (`EquippedTitle` / `EquippedPet`), so a
+  user can have one of each on at once. `emoji` is the item's "image"
+  (zero-cost, no asset pipeline); `rarity` drives the store's visual
+  styling and the price curve (common → first-week goal, legendary →
+  10k-15k coins, a genuine long-term chase).
+- `Achievement` and `ShopItem` are lazily upserted (and re-synced on every
+  purchase/unlock) from static catalogs in code
+  (`src/server/gamification/achievements.ts`, `.../shop-items.ts`) — the
   code is the source of truth, the DB row is a cache. `prisma/seed.ts` also
   pre-populates both catalogs as a convenience.
 - `XPLog` is an audit trail (session completion, streak bonus, achievement

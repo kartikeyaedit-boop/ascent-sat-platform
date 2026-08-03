@@ -18,6 +18,18 @@ enum Role {
   ADMIN
 }
 
+enum ShopItemCategory {
+  TITLE
+  PET
+}
+
+enum ShopItemRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
@@ -32,6 +44,7 @@ model User {
   longestStreak    Int       @default(0)
   lastPracticeDate DateTime?
   equippedTitleId  String?
+  equippedPetId    String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -42,7 +55,8 @@ model User {
   xpLogs                  XPLog[]
   achievements            UserAchievement[]
   purchases               Purchase[]
-  equippedTitle           ShopItem?                @relation(fields: [equippedTitleId], references: [id])
+  equippedTitle           ShopItem?                @relation("EquippedTitle", fields: [equippedTitleId], references: [id])
+  equippedPet             ShopItem?                @relation("EquippedPet", fields: [equippedPetId], references: [id])
 
   @@map("users")
 }
@@ -182,18 +196,23 @@ model UserAchievement {
   @@map("user_achievements")
 }
 
-// A small, real cosmetic shop — profile title badges purchasable with coins
-// earned from practicing. No avatar system exists yet, so titles are the
-// entire catalog for now.
+// A small, real cosmetic shop: profile title badges and collectible pets,
+// purchasable with coins earned from practicing. Titles and pets are
+// equipped independently (a user can have one of each on at once), hence
+// the two separate named relations back from User.
 model ShopItem {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  name      String // the title text itself, e.g. "Wordsmith"
+  id        String           @id @default(cuid())
+  key       String           @unique
+  name      String // the title text or pet name, e.g. "Wordsmith" or "Fox"
+  category  ShopItemCategory @default(TITLE)
+  emoji     String           @default("🏷️")
+  rarity    ShopItemRarity   @default(COMMON)
   price     Int
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
-  purchases  Purchase[]
-  equippedBy User[]
+  purchases         Purchase[]
+  equippedAsTitleBy User[]     @relation("EquippedTitle")
+  equippedAsPetBy   User[]     @relation("EquippedPet")
 
   @@map("shop_items")
 }

@@ -15,7 +15,7 @@ export default async function StorePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Store</h1>
         <p className="text-muted-foreground">
-          Spend coins you&apos;ve earned from practicing on profile titles.
+          Spend coins you&apos;ve earned from practicing on profile titles and collectible pets.
         </p>
       </div>
 

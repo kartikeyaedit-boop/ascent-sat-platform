@@ -49,6 +49,7 @@ const baseUser = {
   longestStreak: 0,
   lastPracticeDate: null,
   equippedTitleId: null,
+  equippedPetId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   passwordHash: "",

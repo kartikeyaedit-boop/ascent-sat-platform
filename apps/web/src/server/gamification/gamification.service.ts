@@ -191,6 +191,7 @@ export interface GamificationSummary {
   currentStreak: number;
   longestStreak: number;
   equippedTitle: string | null;
+  equippedPet: { name: string; emoji: string } | null;
 }
 
 /** Lightweight summary for the topnav/dashboard — no session-specific data. */
@@ -203,6 +204,7 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
       currentStreak: true,
       longestStreak: true,
       equippedTitle: { select: { name: true } },
+      equippedPet: { select: { name: true, emoji: true } },
     },
   });
 
@@ -218,6 +220,7 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
     currentStreak: user.currentStreak,
     longestStreak: user.longestStreak,
     equippedTitle: user.equippedTitle?.name ?? null,
+    equippedPet: user.equippedPet ? { name: user.equippedPet.name, emoji: user.equippedPet.emoji } : null,
   };
 }
 

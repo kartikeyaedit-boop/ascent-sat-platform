@@ -33,8 +33,8 @@ sampling (a real measurement, not approximated).
 | GET | `/api/gamification/achievements` | — | Full 16-achievement catalog merged with this user's unlock status. |
 | GET | `/api/gamification/shop` | — | Full shop catalog merged with this user's owned/equipped status. |
 | POST | `/api/gamification/shop/purchase` | `{ key }` | Buys an item with coins. 409 if already owned, 402 if insufficient coins. |
-| POST | `/api/gamification/shop/equip` | `{ key }` | Equips an owned item as the profile title. 403 if not owned. |
-| POST | `/api/gamification/shop/unequip` | — | Clears the equipped title. |
+| POST | `/api/gamification/shop/equip` | `{ key }` | Equips an owned item into its category's slot (title or pet — the two are independent, equipping one never unequips the other). 403 if not owned. |
+| POST | `/api/gamification/shop/unequip` | `{ category: "TITLE" \| "PET" }` | Clears the equipped item in that slot. |
 
 XP/coins/streak are never awarded directly via API — they're a side effect
 of `POST /api/speech/sessions` (see `src/server/gamification/gamification.service.ts`).

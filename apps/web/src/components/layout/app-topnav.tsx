@@ -73,15 +73,28 @@ export function AppTopNav() {
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 px-2">
-              <Avatar className="size-7">
-                <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                  {user ? getInitials(user.name) : "?"}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium sm:inline">
-                {user?.name}
-              </span>
+            <Button variant="ghost" className="h-auto gap-2 px-2 py-1.5">
+              <div className="relative">
+                <Avatar className="size-7">
+                  <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                    {user ? getInitials(user.name) : "?"}
+                  </AvatarFallback>
+                </Avatar>
+                {summary?.equippedPet && (
+                  <span
+                    className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-background text-[10px] leading-none ring-1 ring-border"
+                    title={summary.equippedPet.name}
+                  >
+                    {summary.equippedPet.emoji}
+                  </span>
+                )}
+              </div>
+              <div className="hidden flex-col items-start sm:flex">
+                <span className="text-sm font-medium leading-tight">{user?.name}</span>
+                {summary?.equippedTitle && (
+                  <span className="text-[10px] leading-tight text-primary">{summary.equippedTitle}</span>
+                )}
+              </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
