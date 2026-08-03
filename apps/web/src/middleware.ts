@@ -30,5 +30,6 @@ export const config = {
     "/store/:path*",
     "/admin/:path*",
     "/settings/:path*",
+    "/library/:path*",
   ],
 };

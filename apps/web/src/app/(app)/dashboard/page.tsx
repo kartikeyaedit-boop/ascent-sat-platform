@@ -107,8 +107,8 @@ export default async function DashboardPage() {
         <CardHeader>
           <CardTitle>More is on the way</CardTitle>
           <CardDescription>
-            The speech library, achievements, and a full analytics dashboard
-            are being built next.
+            A full analytics dashboard and more practice modes are being
+            built next.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

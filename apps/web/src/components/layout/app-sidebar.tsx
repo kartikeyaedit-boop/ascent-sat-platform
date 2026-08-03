@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, enabled: true },
   { label: "Practice", href: "/practice", icon: Mic, enabled: true },
   { label: "Sessions", href: "/sessions", icon: History, enabled: true },
-  { label: "Speech Library", href: "/library", icon: BookOpenText, enabled: false },
+  { label: "Speech Library", href: "/library", icon: BookOpenText, enabled: true },
   { label: "Achievements", href: "/achievements", icon: Medal, enabled: true },
   { label: "Store", href: "/store", icon: ShoppingBag, enabled: true },
 ];
