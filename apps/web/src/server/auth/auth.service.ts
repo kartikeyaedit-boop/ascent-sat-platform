@@ -257,6 +257,34 @@ export async function resetPassword(
   ]);
 }
 
+/**
+ * Lets an already-authenticated user change their own password directly —
+ * doesn't depend on email delivery at all, unlike the forgot-password flow.
+ */
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.passwordHash) throw AuthErrors.invalidCredentials();
+
+  const valid = await verifyPassword(currentPassword, user.passwordHash);
+  if (!valid) throw AuthErrors.invalidCredentials();
+
+  const passwordHash = await hashPassword(newPassword);
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    // Same security practice as resetPassword: revoke other sessions so a
+    // stolen refresh token can't outlive a password change.
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+}
+
 export async function getUserFromAccessToken(
   accessToken: string | undefined,
 ): Promise<PublicUser | null> {

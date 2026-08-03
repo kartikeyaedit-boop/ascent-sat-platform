@@ -86,8 +86,12 @@ export function AppSidebar() {
         {user?.role === "ADMIN" && (
           <Link
             href="/admin"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground opacity-50"
-            title="Coming soon"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              pathname === "/admin" || pathname.startsWith("/admin/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
           >
             <Users className="size-4" />
             Admin

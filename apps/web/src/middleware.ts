@@ -28,5 +28,7 @@ export const config = {
     "/sessions/:path*",
     "/achievements/:path*",
     "/store/:path*",
+    "/admin/:path*",
+    "/settings/:path*",
   ],
 };

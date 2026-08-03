@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Coins, Flame, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -93,12 +94,11 @@ export function AppTopNav() {
                 Soon
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <Settings className="size-4" />
-              Settings
-              <span className="ml-auto text-[10px] text-muted-foreground">
-                Soon
-              </span>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <Settings className="size-4" />
+                Settings
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

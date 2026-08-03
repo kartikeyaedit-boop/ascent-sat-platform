@@ -32,7 +32,7 @@ vi.mock("./mailer", () => ({
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "./mailer";
 import { hashPassword } from "./password";
-import { registerUser, loginUser, refreshSession } from "./auth.service";
+import { registerUser, loginUser, refreshSession, changePassword } from "./auth.service";
 
 const mockedPrisma = vi.mocked(prisma, { deep: true });
 
@@ -161,6 +161,33 @@ describe("loginUser", () => {
     expect(result.user.email).toBe(baseUser.email);
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(result.tokens.refreshToken).toEqual(expect.any(String));
+  });
+});
+
+describe("changePassword", () => {
+  it("throws INVALID_CREDENTIALS when the current password is wrong", async () => {
+    const passwordHash = await hashPassword("CorrectPassword1");
+    mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, passwordHash });
+
+    await expect(
+      changePassword(baseUser.id, "WrongPassword1", "NewPassword1"),
+    ).rejects.toMatchObject({ code: "INVALID_CREDENTIALS" });
+  });
+
+  it("updates the password hash and revokes other sessions on success", async () => {
+    const passwordHash = await hashPassword("CorrectPassword1");
+    mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, passwordHash });
+    mockedPrisma.user.update.mockResolvedValue({} as never);
+    mockedPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 } as never);
+
+    await changePassword(baseUser.id, "CorrectPassword1", "NewPassword1");
+
+    expect(mockedPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: baseUser.id } }),
+    );
+    expect(mockedPrisma.refreshToken.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: baseUser.id, revokedAt: null } }),
+    );
   });
 });
 

@@ -54,3 +54,10 @@ export function resetPassword(input: { token: string; password: string }) {
     body: input,
   });
 }
+
+export function changePassword(input: { currentPassword: string; newPassword: string }) {
+  return apiFetch<{ ok: true }>("/api/auth/change-password", {
+    method: "POST",
+    body: input,
+  });
+}
