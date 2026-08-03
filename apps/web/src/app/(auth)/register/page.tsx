@@ -59,19 +59,16 @@ export default function RegisterPage() {
           <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <MailCheck className="size-6" />
           </div>
-          <CardTitle className="mt-2">Check your email</CardTitle>
+          <CardTitle className="mt-2">Account created</CardTitle>
           <CardDescription>
-            We sent a verification link to <strong>{submittedEmail}</strong>.
-            Click it to activate your account, then log in.
+            <strong>{submittedEmail}</strong> is ready to go — you can log in
+            right away.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          <Link
-            href="/login"
-            className="text-sm font-medium underline underline-offset-4"
-          >
-            Back to login
-          </Link>
+          <Button asChild className="w-full">
+            <Link href="/login">Log in</Link>
+          </Button>
         </CardContent>
       </Card>
     );

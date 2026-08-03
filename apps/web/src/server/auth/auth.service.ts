@@ -87,11 +87,25 @@ export async function registerUser(input: {
   if (existing) throw AuthErrors.emailTaken();
 
   const passwordHash = await hashPassword(input.password);
+  // Accounts are verified immediately rather than gated on clicking an
+  // emailed link: this app's transactional email (Resend, no verified
+  // sending domain) can only actually deliver to the Resend account
+  // owner's own address — every other recipient gets rejected. Gating
+  // login on a link that can't be delivered would lock out every real
+  // signup, so verification isn't a login requirement here.
   const user = await prisma.user.create({
-    data: { email: input.email, passwordHash, name: input.name },
+    data: { email: input.email, passwordHash, name: input.name, emailVerified: true },
   });
 
-  await sendVerificationEmail(user);
+  // Still attempt a welcome email as a best-effort nicety — if a real
+  // sending domain gets verified later this starts actually arriving —
+  // but its failure must never block account creation itself.
+  try {
+    await sendVerificationEmail(user);
+  } catch (err) {
+    console.error(`Welcome email failed to send for ${user.email}:`, err);
+  }
+
   return toPublicUser(user);
 }
 
@@ -177,7 +191,11 @@ export async function resendVerificationEmail(email: string): Promise<void> {
   await prisma.emailVerificationToken.deleteMany({
     where: { userId: user.id },
   });
-  await sendVerificationEmail(user);
+  try {
+    await sendVerificationEmail(user);
+  } catch (err) {
+    console.error(`Resend verification email failed for ${user.email}:`, err);
+  }
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
@@ -196,7 +214,15 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
   const link = `${env.APP_URL}/reset-password?token=${raw}`;
   const { subject, html, text } = passwordResetEmail(link);
-  await sendEmail({ to: user.email, subject, html, text });
+  try {
+    await sendEmail({ to: user.email, subject, html, text });
+  } catch (err) {
+    // Same non-fatal treatment as registerUser — an email provider that
+    // can't reach this recipient shouldn't crash the request, and the
+    // "don't reveal whether the account exists" behavior above already
+    // means this endpoint never signals success/failure to the caller.
+    console.error(`Password reset email failed for ${user.email}:`, err);
+  }
 }
 
 export async function resetPassword(

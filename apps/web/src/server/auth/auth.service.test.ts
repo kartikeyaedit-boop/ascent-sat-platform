@@ -71,12 +71,9 @@ describe("registerUser", () => {
     ).rejects.toMatchObject({ code: "EMAIL_TAKEN" });
   });
 
-  it("creates a user and sends a verification email on success", async () => {
+  it("creates an already-verified user and sends a welcome email on success", async () => {
     mockedPrisma.user.findUnique.mockResolvedValue(null);
-    mockedPrisma.user.create.mockResolvedValue({
-      ...baseUser,
-      emailVerified: false,
-    });
+    mockedPrisma.user.create.mockResolvedValue(baseUser);
     mockedPrisma.emailVerificationToken.create.mockResolvedValue({} as never);
 
     const user = await registerUser({
@@ -86,8 +83,31 @@ describe("registerUser", () => {
     });
 
     expect(user.email).toBe(baseUser.email);
-    expect(mockedPrisma.user.create).toHaveBeenCalledOnce();
+    expect(user.emailVerified).toBe(true);
+    expect(mockedPrisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ emailVerified: true }) }),
+    );
     expect(sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("still succeeds even when the welcome email fails to send", async () => {
+    // This is the actual production bug being guarded against: a
+    // transactional email provider that can only deliver to its own
+    // verified sender address rejects every other recipient, which used
+    // to crash the whole registration request with a 500.
+    mockedPrisma.user.findUnique.mockResolvedValue(null);
+    mockedPrisma.user.create.mockResolvedValue(baseUser);
+    mockedPrisma.emailVerificationToken.create.mockResolvedValue({} as never);
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend API error (403)"));
+
+    const user = await registerUser({
+      email: baseUser.email,
+      password: "Password1",
+      name: "Jane Doe",
+    });
+
+    expect(user.email).toBe(baseUser.email);
+    expect(user.emailVerified).toBe(true);
   });
 });
 
