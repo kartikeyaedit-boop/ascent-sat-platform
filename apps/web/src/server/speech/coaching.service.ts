@@ -106,9 +106,17 @@ export function generateCoachingFeedback(
   }
 
   // --- Vocal variety ---
+  // Three tiers, not two: a mid-range score used to fall into a silent gap
+  // (not good enough to praise, not bad enough for the old <40 threshold),
+  // so the written feedback could read as "nothing wrong" while this
+  // dimension quietly dragged the overall score down. Every range now gets
+  // an honest, proportionate note.
   if (metrics.vocalVarietyScore >= 70) {
     strengths.push("Your voice had good energy and variation, which kept the delivery engaging.");
-  } else if (metrics.vocalVarietyScore < 40) {
+  } else if (metrics.vocalVarietyScore >= 40) {
+    weaknesses.push("Your vocal variety was decent but fairly moderate — a bit more pitch and volume range would make your delivery more engaging.");
+    actionPlan.push("Pick one key word per sentence and consciously emphasize it with pitch or volume.");
+  } else {
     weaknesses.push("Your voice stayed fairly flat, which can read as less engaged even when the content is strong.");
     actionPlan.push("Consciously emphasize your key words by varying pitch and volume, not just speaking louder.");
     practiceDrills.push("Read a children's book aloud, exaggerating your pitch changes twice as much as feels natural — it'll sound normal to listeners.");
@@ -117,7 +125,10 @@ export function generateCoachingFeedback(
   // --- Clarity ---
   if (metrics.clarityScore >= 85) {
     strengths.push("Your words came through clearly and were easy to follow.");
-  } else if (metrics.clarityScore < 60) {
+  } else if (metrics.clarityScore >= 60) {
+    weaknesses.push("Your words mostly came through, but articulation could be a bit crisper in places.");
+    practiceDrills.push("Practice a tongue twister slowly and deliberately for one minute, focusing on finishing every consonant.");
+  } else {
     weaknesses.push("Some words weren't fully clear — crisper articulation, especially at the ends of words, will help.");
     practiceDrills.push("Practice a tongue twister slowly and deliberately for one minute, focusing on finishing every consonant.");
   }

@@ -111,6 +111,26 @@ describe("generateCoachingFeedback", () => {
     expect(result.strengths.some((s) => /energy|variation/i.test(s))).toBe(true);
   });
 
+  it("gives an honest note for mid-range vocal variety instead of staying silent about it", () => {
+    // A score that's neither good enough to praise (>=70) nor bad enough
+    // for the old <40 "flat" wording used to fall into a silent gap —
+    // the written feedback stayed quiet about it even though it was
+    // dragging the numeric score down.
+    const result = generateCoachingFeedback({
+      ...baseInput,
+      metrics: { ...baseInput.metrics, vocalVarietyScore: 55 },
+    });
+    expect(result.weaknesses.some((w) => /variety|variation/i.test(w))).toBe(true);
+  });
+
+  it("gives an honest note for mid-range clarity instead of staying silent about it", () => {
+    const result = generateCoachingFeedback({
+      ...baseInput,
+      metrics: { ...baseInput.metrics, clarityScore: 70 },
+    });
+    expect(result.weaknesses.some((w) => /articulation|clear/i.test(w))).toBe(true);
+  });
+
   it("gives a more encouraging motivational note for a low overall score", () => {
     const low = generateCoachingFeedback({
       ...baseInput,
