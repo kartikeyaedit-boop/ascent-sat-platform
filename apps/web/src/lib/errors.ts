@@ -35,3 +35,16 @@ export const SpeechErrors = {
   sessionNotFound: () =>
     new AppError("NOT_FOUND", "Session not found.", 404),
 };
+
+export const GamificationErrors = {
+  itemNotFound: () =>
+    new AppError("NOT_FOUND", "Shop item not found.", 404),
+  alreadyOwned: () =>
+    new AppError("ALREADY_OWNED", "You already own this item.", 409),
+  insufficientCoins: () =>
+    new AppError("INSUFFICIENT_COINS", "You don't have enough coins for this.", 402),
+  notOwned: () =>
+    new AppError("NOT_OWNED", "You don't own this item.", 403),
+  achievementNotFound: () =>
+    new AppError("NOT_FOUND", "Achievement not found.", 404),
+};

@@ -9,8 +9,8 @@ device) before the next one starts.
 | 0 | Rebrand from the abandoned SAT-prep idea: kept the auth system and deployment infra, stripped everything SAT-specific | ✅ Done |
 | 1 | Core recording + live feedback: mic capture, live browser-native transcription, live WPM/filler/pause tracking, session storage, rule-based coaching report — entirely free, no API keys | ✅ Done |
 | 2 | Practice modes: mode-specific prompts (impromptu, interview, debate, presentation, elevator pitch, etc.) | Planned |
-| 3 | Session history + analytics dashboard: past sessions, trend charts, weakest/strongest skills | Planned |
-| 4 | Gamification: XP, levels, coins, streaks, achievements | Planned |
+| 3 | Session history + analytics dashboard: past sessions list is done; trend charts / weakest-strongest-skills analytics still planned | 🟡 Partial |
+| 4 | Gamification: XP, derived levels, coins, daily streaks, 16 achievements, a small real cosmetic store (purchasable/equippable profile titles) | ✅ Done |
 | 5 | Speech library: communication techniques (Rule of Three, PREP, Monroe's Motivated Sequence, etc.) with interactive exercises; curated example-speech excerpts focused on technique, not imitation | Planned |
 | 6 | Daily exercises: tongue twisters, breathing drills, timed challenges | Planned |
 | 7 | AI speech generator and richer AI-written coaching prose — would require a paid LLM API, revisit if/when budget allows | Deferred |

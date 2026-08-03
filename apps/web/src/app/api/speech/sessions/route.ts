@@ -8,12 +8,12 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   const user = await requireUser();
   const body = createSessionSchema.parse(await request.json());
 
-  const { session, feedback } = await createSession({
+  const { session, feedback, rewards } = await createSession({
     userId: user.id,
     ...body,
   });
 
-  return apiSuccess({ session, feedback }, 201);
+  return apiSuccess({ session, feedback, rewards }, 201);
 });
 
 export const GET = withErrorHandling(async (request: NextRequest) => {

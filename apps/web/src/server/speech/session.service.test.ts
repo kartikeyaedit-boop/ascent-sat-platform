@@ -11,13 +11,19 @@ vi.mock("./coaching.service", () => ({
   generateCoachingFeedback: vi.fn(),
 }));
 
+vi.mock("@/server/gamification/gamification.service", () => ({
+  awardSessionRewards: vi.fn(),
+}));
+
 import { prisma } from "@/lib/prisma";
 import { generateCoachingFeedback } from "./coaching.service";
+import { awardSessionRewards } from "@/server/gamification/gamification.service";
 import { createSession, getSessionForUser, listSessionsForUser } from "./session.service";
 import type { WordTimestamp } from "@/lib/speech-metrics";
 
 const mockedPrisma = vi.mocked(prisma, { deep: true });
 const mockedGenerateCoachingFeedback = vi.mocked(generateCoachingFeedback);
+const mockedAwardSessionRewards = vi.mocked(awardSessionRewards);
 
 function words(): WordTimestamp[] {
   return [
@@ -38,9 +44,22 @@ const baseInput = {
   claritySamples: [],
 };
 
+const baseRewards = {
+  xpAwarded: 20,
+  coinsAwarded: 5,
+  streakBonusXp: 0,
+  currentStreak: 1,
+  longestStreak: 1,
+  isNewStreakDay: true,
+  unlockedAchievements: [],
+  totalXp: 20,
+  totalCoins: 5,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockedPrisma.speechSession.create.mockResolvedValue({ id: "session_1" } as never);
+  mockedAwardSessionRewards.mockResolvedValue(baseRewards);
 });
 
 describe("createSession", () => {
@@ -78,6 +97,40 @@ describe("createSession", () => {
 
     expect(result.session).toEqual({ id: "session_1" });
     expect(result.feedback).toBeNull();
+  });
+
+  it("includes gamification rewards from awardSessionRewards", async () => {
+    mockedGenerateCoachingFeedback.mockReturnValue({
+      strengths: [],
+      weaknesses: [],
+      actionPlan: [],
+      practiceDrills: [],
+      motivationalNote: "Nice work.",
+    });
+    mockedPrisma.coachingFeedback.create.mockResolvedValue({ id: "feedback_1" } as never);
+
+    const result = await createSession(baseInput);
+
+    expect(mockedAwardSessionRewards).toHaveBeenCalledOnce();
+    expect(mockedAwardSessionRewards.mock.calls[0]![0]!.sessionId).toBe("session_1");
+    expect(result.rewards).toEqual(baseRewards);
+  });
+
+  it("degrades to rewards: null instead of throwing when reward-awarding fails", async () => {
+    mockedGenerateCoachingFeedback.mockReturnValue({
+      strengths: [],
+      weaknesses: [],
+      actionPlan: [],
+      practiceDrills: [],
+      motivationalNote: "Nice work.",
+    });
+    mockedPrisma.coachingFeedback.create.mockResolvedValue({ id: "feedback_1" } as never);
+    mockedAwardSessionRewards.mockRejectedValue(new Error("DB unavailable"));
+
+    const result = await createSession(baseInput);
+
+    expect(result.session).toEqual({ id: "session_1" });
+    expect(result.rewards).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, LogOut, Settings, User as UserIcon } from "lucide-react";
+import { Coins, Flame, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useLogout } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/auth-store";
+import { useGamificationSummary } from "@/hooks/use-gamification";
 
 function getInitials(name: string): string {
   return name
@@ -27,23 +28,42 @@ function getInitials(name: string): string {
 export function AppTopNav() {
   const user = useAuthStore((s) => s.user);
   const logoutMutation = useLogout();
+  const { data: summary } = useGamificationSummary();
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-sm font-semibold text-orange-500">
+        <div
+          className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-sm font-semibold text-orange-500"
+          title={
+            summary
+              ? `${summary.currentStreak}-day streak (longest: ${summary.longestStreak})`
+              : "Streak"
+          }
+        >
           <Flame className="size-4" />
-          <span title="Streak — coming in Phase 4">0</span>
+          <span>{summary?.currentStreak ?? 0}</span>
+        </div>
+        <div className="hidden items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-sm font-semibold text-amber-600 sm:flex">
+          <Coins className="size-4" />
+          <span>{summary?.coins ?? 0}</span>
         </div>
         <div
           className="hidden items-center gap-2 sm:flex"
-          title="XP — coming in Phase 4"
+          title={
+            summary
+              ? `${summary.xpIntoLevel} / ${summary.xpForNextLevel} XP to level ${summary.level + 1}`
+              : "XP"
+          }
         >
           <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-0 rounded-full bg-primary" />
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${Math.round((summary?.progress ?? 0) * 100)}%` }}
+            />
           </div>
           <span className="text-xs font-medium text-muted-foreground">
-            Level 1
+            Level {summary?.level ?? 1}
           </span>
         </div>
       </div>

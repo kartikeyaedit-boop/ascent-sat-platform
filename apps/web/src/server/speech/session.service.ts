@@ -13,6 +13,7 @@ import {
   type AudioSample,
 } from "@/lib/speech-metrics";
 import { generateCoachingFeedback } from "./coaching.service";
+import { awardSessionRewards, type SessionRewardsResult } from "@/server/gamification/gamification.service";
 
 export interface CreateSessionInput {
   userId: string;
@@ -114,7 +115,27 @@ export async function createSession(input: CreateSessionInput) {
     console.error(`Coaching feedback generation failed for session ${session.id}:`, err);
   }
 
-  return { session, feedback: coachingFeedback };
+  // Same non-fatal-failure principle as coaching feedback above: rewards
+  // are a bonus on top of an already-stored session, not a prerequisite.
+  let rewards: SessionRewardsResult | null = null;
+  try {
+    rewards = await awardSessionRewards({
+      userId: input.userId,
+      sessionId: session.id,
+      overallScore,
+      wpm,
+      fillerWordCount: fillerWords.length,
+      durationSeconds: Math.round(input.durationSeconds),
+      confidenceScore: confidence.score,
+      clarityScore,
+      paceScore: pace.score,
+      vocalVarietyScore: vocalVariety.score,
+    });
+  } catch (err) {
+    console.error(`Gamification rewards failed for session ${session.id}:`, err);
+  }
+
+  return { session, feedback: coachingFeedback, rewards };
 }
 
 export async function getSessionForUser(sessionId: string, userId: string) {

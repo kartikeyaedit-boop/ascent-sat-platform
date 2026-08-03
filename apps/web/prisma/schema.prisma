@@ -19,20 +19,30 @@ enum Role {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String?
-  name          String
-  avatarUrl     String?
-  role          Role     @default(STUDENT)
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String?
+  name             String
+  avatarUrl        String?
+  role             Role      @default(STUDENT)
+  emailVerified    Boolean   @default(false)
+  xp               Int       @default(0)
+  coins            Int       @default(0)
+  currentStreak    Int       @default(0)
+  longestStreak    Int       @default(0)
+  lastPracticeDate DateTime?
+  equippedTitleId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   speechSessions          SpeechSession[]
+  xpLogs                  XPLog[]
+  achievements            UserAchievement[]
+  purchases               Purchase[]
+  equippedTitle           ShopItem?                @relation(fields: [equippedTitleId], references: [id])
 
   @@map("users")
 }
@@ -83,24 +93,24 @@ model PasswordResetToken {
 // from the client, even though the client computes the same numbers live
 // for in-progress display during recording. See docs/architecture.md.
 model SpeechSession {
-  id                String   @id @default(cuid())
-  userId            String
-  mode              String
-  promptText        String?
-  transcript        String
-  durationSeconds   Int
-  wpm               Float
-  fillerWords       Json // [{ word, timestampMs }]
-  pauseCount        Int
-  longPauseCount    Int
-  avgPauseMs        Float
-  confidenceScore   Int
+  id                    String   @id @default(cuid())
+  userId                String
+  mode                  String
+  promptText            String?
+  transcript            String
+  durationSeconds       Int
+  wpm                   Float
+  fillerWords           Json // [{ word, timestampMs }]
+  pauseCount            Int
+  longPauseCount        Int
+  avgPauseMs            Float
+  confidenceScore       Int
   confidenceExplanation Json // string[] — why the confidence score is what it is
-  clarityScore      Int
-  paceScore         Int
-  vocalVarietyScore Int
-  overallScore      Int
-  createdAt         DateTime @default(now())
+  clarityScore          Int
+  paceScore             Int
+  vocalVarietyScore     Int
+  overallScore          Int
+  createdAt             DateTime @default(now())
 
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   feedback CoachingFeedback?
@@ -122,4 +132,82 @@ model CoachingFeedback {
   session SpeechSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("coaching_feedback")
+}
+
+// Audit trail of every XP award — lets the level/streak math stay derived and
+// auditable rather than trusting a single mutable counter. See src/lib/gamification.ts.
+model XPLog {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  reason    String // e.g. "session_complete", "streak_bonus", "achievement:first_session"
+  sessionId String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("xp_logs")
+}
+
+// Static achievement definitions. Checked by src/server/gamification/achievements.ts,
+// not a generic rules engine — each achievement has hand-written unlock logic.
+model Achievement {
+  id          String   @id @default(cuid())
+  key         String   @unique // stable code identifier, e.g. "first_session"
+  name        String
+  description String
+  icon        String // lucide icon name
+  xpReward    Int      @default(0)
+  coinReward  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  unlockedBy UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+// A small, real cosmetic shop — profile title badges purchasable with coins
+// earned from practicing. No avatar system exists yet, so titles are the
+// entire catalog for now.
+model ShopItem {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String // the title text itself, e.g. "Wordsmith"
+  price     Int
+  createdAt DateTime @default(now())
+
+  purchases  Purchase[]
+  equippedBy User[]
+
+  @@map("shop_items")
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  userId     String
+  shopItemId String
+  pricePaid  Int
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopItemId])
+  @@index([userId])
+  @@map("purchases")
 }

@@ -58,13 +58,73 @@ Notes:
   (rather than columns on `SpeechSession`) so a session can exist even if
   writing its feedback row fails for some reason — see `session.service.ts`.
 
+## Gamification (Phase 4)
+
+```mermaid
+erDiagram
+    User ||--o{ XPLog : logs
+    User ||--o{ UserAchievement : unlocks
+    Achievement ||--o{ UserAchievement : unlocked_by
+    User ||--o{ Purchase : buys
+    ShopItem ||--o{ Purchase : bought_via
+    User }o--o| ShopItem : equips
+
+    XPLog {
+        string id PK
+        string userId FK
+        int amount
+        string reason
+        string sessionId "nullable"
+        datetime createdAt
+    }
+    Achievement {
+        string id PK
+        string key UK
+        string name
+        string description
+        string icon
+        int xpReward
+        int coinReward
+    }
+    UserAchievement {
+        string id PK
+        string userId FK
+        string achievementId FK
+        datetime unlockedAt
+    }
+    ShopItem {
+        string id PK
+        string key UK
+        string name
+        int price
+    }
+    Purchase {
+        string id PK
+        string userId FK
+        string shopItemId FK
+        int pricePaid
+        datetime createdAt
+    }
+```
+
+Notes:
+- `User` gained `xp`, `coins`, `currentStreak`, `longestStreak`,
+  `lastPracticeDate`, `equippedTitleId` — level is always *derived* from
+  `xp` (see `calculateLevel` in `src/lib/gamification.ts`), never stored,
+  so it can't drift out of sync.
+- `Achievement` and `ShopItem` are lazily upserted from static catalogs in
+  code (`src/server/gamification/achievements.ts`,
+  `.../shop-items.ts`) the first time each one unlocks/is purchased — the
+  code is the source of truth, the DB row is a cache. `prisma/seed.ts` also
+  pre-populates both catalogs as a convenience.
+- `XPLog` is an audit trail (session completion, streak bonus, achievement
+  unlocks each log a row) — not the balance itself; `User.xp`/`User.coins`
+  are incremented directly and are what's actually read.
+
 ## Planned (added per-phase, not yet implemented)
 
 - **Phase 2 — Practice modes**: mode metadata, `SpeechPrompt` (library of
   prompts per mode, or AI-generated on demand).
-- **Phase 4 — Gamification**: `XPLog`, `CoinLog`, `Streak`, `Achievement`,
-  `UserAchievement`, `ShopItem`, `Purchase` — same pattern designed for the
-  (abandoned) SAT platform, ported over conceptually.
 - **Phase 5 — Speech library**: `Technique` (Rule of Three, PREP, etc.),
   `ExampleSpeech` (curated excerpts, technique-focused).
 - **Phase 6 — Daily exercises**: `Exercise`, `DailyExercise`.
