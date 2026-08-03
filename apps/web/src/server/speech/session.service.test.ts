@@ -136,6 +136,61 @@ describe("createSession", () => {
     expect(result.session).toEqual({ id: "session_1" });
     expect(result.rewards).toBeNull();
   });
+
+  it("forces every score to 0 and skips rewards entirely for a session with no detected speech", async () => {
+    mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "No speech was detected.",
+      strengths: [],
+      weaknesses: [],
+      actionPlan: [],
+      practiceDrills: [],
+      motivationalNote: "Try again.",
+    });
+    mockedPrisma.coachingFeedback.create.mockResolvedValue({ id: "feedback_1" } as never);
+
+    await createSession({ ...baseInput, transcript: "", wordTimestamps: [] });
+
+    const createArgs = mockedPrisma.speechSession.create.mock.calls[0][0];
+    expect(createArgs.data.wpm).toBe(0);
+    expect(createArgs.data.overallScore).toBe(0);
+    expect(createArgs.data.confidenceScore).toBe(0);
+    expect(createArgs.data.clarityScore).toBe(0);
+    expect(createArgs.data.paceScore).toBe(0);
+    expect(createArgs.data.vocalVarietyScore).toBe(0);
+    expect(mockedAwardSessionRewards).not.toHaveBeenCalled();
+  });
+
+  it("detects a real pause from volume data even though the word timestamps are back-to-back", async () => {
+    mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "s",
+      strengths: [],
+      weaknesses: [],
+      actionPlan: [],
+      practiceDrills: [],
+      motivationalNote: "m",
+    });
+    mockedPrisma.coachingFeedback.create.mockResolvedValue({ id: "feedback_1" } as never);
+
+    // Word timestamps show no gap at all (as the approximation would if a
+    // pause happened mid-phrase, before the recognizer finalized) — the
+    // real pause only shows up in the volume timeline.
+    const backToBackWords = [
+      { word: "hello", startMs: 0, endMs: 200, confidence: 0.9 },
+      { word: "world", startMs: 200, endMs: 400, confidence: 0.9 },
+    ];
+    const volumeSamples = [
+      { atMs: 0, value: 0.2 },
+      { atMs: 150, value: 0.2 },
+      ...Array.from({ length: 8 }, (_, i) => ({ atMs: 300 + i * 150, value: 0.001 })), // ~1.2s pause
+      { atMs: 1500, value: 0.2 },
+      { atMs: 1650, value: 0.2 },
+    ];
+
+    await createSession({ ...baseInput, wordTimestamps: backToBackWords, volumeSamples });
+
+    const createArgs = mockedPrisma.speechSession.create.mock.calls[0][0];
+    expect(createArgs.data.pauseCount).toBeGreaterThan(0);
+  });
 });
 
 describe("getSessionForUser", () => {

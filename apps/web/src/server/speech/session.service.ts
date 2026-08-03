@@ -5,6 +5,7 @@ import {
   scorePace,
   detectFillerWords,
   analyzePauses,
+  analyzePausesFromVolume,
   computeVocalVarietyScore,
   computeClarityScore,
   computeConfidenceScore,
@@ -14,6 +15,12 @@ import {
 } from "@/lib/speech-metrics";
 import { generateCoachingFeedback } from "./coaching.service";
 import { awardSessionRewards, type SessionRewardsResult } from "@/server/gamification/gamification.service";
+
+/** Below this many volume samples (~1.5s of the client's 150ms sampling
+ * interval), there's too little data to trust real-silence-based pause
+ * detection — fall back to the word-timestamp-gap approximation instead
+ * of treating "we barely sampled anything" as "there were no pauses". */
+const MIN_VOLUME_SAMPLES_FOR_PAUSE_DETECTION = 10;
 
 export interface CreateSessionInput {
   userId: string;
@@ -37,25 +44,46 @@ export async function createSession(input: CreateSessionInput) {
   const wpm = calculateWpm(input.wordTimestamps, input.durationSeconds);
   const pace = scorePace(wpm);
   const fillerWords = detectFillerWords(input.wordTimestamps);
-  const pauseAnalysis = analyzePauses(input.wordTimestamps);
+  // Prefer real silence detection from mic volume over the word-timestamp-gap
+  // approximation — see analyzePausesFromVolume's docstring for why the
+  // word-gap method can miss a pause entirely (it can only see gaps between
+  // already-finalized speech-recognition chunks, not silence that happened
+  // inside one).
+  const pauseAnalysis =
+    input.volumeSamples.length >= MIN_VOLUME_SAMPLES_FOR_PAUSE_DETECTION
+      ? analyzePausesFromVolume(input.volumeSamples, input.wordTimestamps.length)
+      : analyzePauses(input.wordTimestamps);
   const vocalVariety = computeVocalVarietyScore(input.pitchSamples, input.volumeSamples);
   const clarityScore = computeClarityScore(input.claritySamples);
 
-  const confidence = computeConfidenceScore({
-    paceScore: pace.score,
-    fillerCount: fillerWords.length,
-    wordCount: input.wordTimestamps.length,
-    pauseScore: pauseAnalysis.score,
-    vocalVarietyScore: vocalVariety.score,
-    pace,
-  });
+  // No words were transcribed at all — there's nothing to meaningfully
+  // score. Without this guard, fallback defaults tuned for short *spoken*
+  // clips (e.g. the zero-pause baseline) would leak in and produce a
+  // confusingly nonzero score for a session where nothing was said.
+  const isSilent = wpm === 0;
 
-  const overallScore = computeOverallScore({
-    confidenceScore: confidence.score,
-    clarityScore,
-    paceScore: pace.score,
-    vocalVarietyScore: vocalVariety.score,
-  });
+  const confidence = isSilent
+    ? { score: 0, explanation: ["No speech was detected in this session."] }
+    : computeConfidenceScore({
+        paceScore: pace.score,
+        fillerCount: fillerWords.length,
+        wordCount: input.wordTimestamps.length,
+        pauseScore: pauseAnalysis.score,
+        vocalVarietyScore: vocalVariety.score,
+        pace,
+      });
+
+  const finalClarityScore = isSilent ? 0 : clarityScore;
+  const finalVocalVarietyScore = isSilent ? 0 : vocalVariety.score;
+
+  const overallScore = isSilent
+    ? 0
+    : computeOverallScore({
+        confidenceScore: confidence.score,
+        clarityScore: finalClarityScore,
+        paceScore: pace.score,
+        vocalVarietyScore: finalVocalVarietyScore,
+      });
 
   const session = await prisma.speechSession.create({
     data: {
@@ -71,9 +99,9 @@ export async function createSession(input: CreateSessionInput) {
       avgPauseMs: pauseAnalysis.avgPauseMs,
       confidenceScore: confidence.score,
       confidenceExplanation: confidence.explanation,
-      clarityScore,
+      clarityScore: finalClarityScore,
       paceScore: pace.score,
-      vocalVarietyScore: vocalVariety.score,
+      vocalVarietyScore: finalVocalVarietyScore,
       overallScore,
     },
   });
@@ -95,8 +123,8 @@ export async function createSession(input: CreateSessionInput) {
         pauseCount: pauseAnalysis.pauseCount,
         longPauseCount: pauseAnalysis.longPauseCount,
         confidenceScore: confidence.score,
-        clarityScore,
-        vocalVarietyScore: vocalVariety.score,
+        clarityScore: finalClarityScore,
+        vocalVarietyScore: finalVocalVarietyScore,
         overallScore,
       },
     });
@@ -118,22 +146,26 @@ export async function createSession(input: CreateSessionInput) {
 
   // Same non-fatal-failure principle as coaching feedback above: rewards
   // are a bonus on top of an already-stored session, not a prerequisite.
+  // Silent sessions earn nothing — there's no practice to reward, and
+  // awarding base XP for empty recordings would be an easy farm.
   let rewards: SessionRewardsResult | null = null;
-  try {
-    rewards = await awardSessionRewards({
-      userId: input.userId,
-      sessionId: session.id,
-      overallScore,
-      wpm,
-      fillerWordCount: fillerWords.length,
-      durationSeconds: Math.round(input.durationSeconds),
-      confidenceScore: confidence.score,
-      clarityScore,
-      paceScore: pace.score,
-      vocalVarietyScore: vocalVariety.score,
-    });
-  } catch (err) {
-    console.error(`Gamification rewards failed for session ${session.id}:`, err);
+  if (!isSilent) {
+    try {
+      rewards = await awardSessionRewards({
+        userId: input.userId,
+        sessionId: session.id,
+        overallScore,
+        wpm,
+        fillerWordCount: fillerWords.length,
+        durationSeconds: Math.round(input.durationSeconds),
+        confidenceScore: confidence.score,
+        clarityScore: finalClarityScore,
+        paceScore: pace.score,
+        vocalVarietyScore: finalVocalVarietyScore,
+      });
+    } catch (err) {
+      console.error(`Gamification rewards failed for session ${session.id}:`, err);
+    }
   }
 
   return { session, feedback: coachingFeedback, rewards };

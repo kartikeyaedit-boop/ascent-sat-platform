@@ -128,4 +128,15 @@ describe("generateCoachingFeedback", () => {
     const b = generateCoachingFeedback(baseInput);
     expect(a).toEqual(b);
   });
+
+  it("says no speech was detected instead of a normal breakdown when wpm is 0", () => {
+    const result = generateCoachingFeedback({
+      ...baseInput,
+      metrics: { ...baseInput.metrics, wpm: 0, overallScore: 0 },
+    });
+    expect(result.summary).toMatch(/no speech was detected/i);
+    expect(result.weaknesses.some((w) => /no speech was detected/i.test(w))).toBe(true);
+    expect(result.strengths.length).toBeGreaterThan(0);
+    expect(result.actionPlan.some((a) => /microphone/i.test(a))).toBe(true);
+  });
 });

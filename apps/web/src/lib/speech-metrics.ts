@@ -21,6 +21,8 @@
  * genuine measurement.
  */
 
+import { SILENCE_RMS_THRESHOLD } from "./audio-analysis";
+
 export interface WordTimestamp {
   word: string;
   startMs: number;
@@ -77,8 +79,20 @@ export interface ConfidenceResult {
 
 /** General-purpose target range; Phase 2 will make this mode-specific
  * (conversational vs. TED-style vs. interview all have different ideal
- * paces). Sourced from commonly cited public-speaking pace guidance. */
+ * paces). 120-160 wpm is the commonly cited "engaging presentation" sweet
+ * spot (e.g. Toastmasters guidance, National Center for Voice and Speech
+ * figures for conversational English), but real speakers vary a lot
+ * around it without sounding bad — a deliberate 100 wpm or an energetic
+ * 175 wpm both read as perfectly normal, just different styles. */
 const IDEAL_WPM_RANGE = { min: 120, max: 160 };
+
+/** How far outside the ideal band you can be before hitting 0. Wider than
+ * the band itself (was equal to it, i.e. 40 — meaning 80wpm or 200wpm
+ * already scored 0, which is far too harsh for a genuinely normal,
+ * unhurried speaking pace). 90 means the floor isn't reached until ~30wpm
+ * or ~250wpm — clearly-extreme rates — while anything in between still
+ * loses only proportionally modest points. */
+const PACE_FALLOFF_RANGE = 90;
 
 const PAUSE_THRESHOLDS_MS = {
   /** Below this, it's just natural word spacing, not a "pause". */
@@ -120,16 +134,14 @@ export function scorePace(wpm: number): PaceResult {
     return { wpm, score: 100, label: "ideal" };
   }
 
-  // Linear falloff outside the ideal range: full points inside the band,
-  // dropping to 0 at 2x the distance from the nearest edge of a
-  // same-sized band beyond it (i.e. by ~80wpm outside the range).
+  // Linear falloff outside the ideal range — see PACE_FALLOFF_RANGE for why
+  // this is intentionally gentle rather than a steep cliff.
   const distance = wpm < min ? min - wpm : wpm - max;
-  const falloffRange = max - min || 40;
-  const score = Math.max(0, Math.round(100 - (distance / falloffRange) * 100));
+  const score = Math.max(0, Math.round(100 - (distance / PACE_FALLOFF_RANGE) * 100));
 
   let label: PaceResult["label"];
-  if (wpm < min) label = distance > falloffRange ? "too slow" : "slightly slow";
-  else label = distance > falloffRange ? "too fast" : "slightly fast";
+  if (wpm < min) label = distance > PACE_FALLOFF_RANGE / 2 ? "too slow" : "slightly slow";
+  else label = distance > PACE_FALLOFF_RANGE / 2 ? "too fast" : "slightly fast";
 
   return { wpm, score, label };
 }
@@ -158,6 +170,38 @@ export function detectFillerWords(words: WordTimestamp[]): FillerOccurrence[] {
   return occurrences;
 }
 
+/** Points deducted per pause by severity. A ratio-based score (what
+ * fraction of pauses were "bad") is unstable with only a handful of data
+ * points — a single genuine 2-second thinking pause is 100% of a
+ * one-pause session's pauses, which would zero out the whole dimension
+ * even though one unhurried pause is completely normal. Deducting a fixed
+ * amount per pause instead means one long pause costs a little, not
+ * everything, while a session full of them still adds up to a real
+ * penalty. "Long" (1.5-3s) is deliberately cheap — linguistically that's
+ * still a normal thinking/emphasis pause, not a stumble; "awkward" (>3s)
+ * costs much more since that's the range that actually reads as hesitant. */
+const PAUSE_PENALTY = {
+  long: 8,
+  awkward: 25,
+};
+
+function scorePauseQuality(pauses: PauseInfo[], wordCount: number): number {
+  if (pauses.length === 0) {
+    // Never pausing at all is itself often a rushed/hesitant pattern, not a
+    // neutral default — still scaled down for very short takes that
+    // genuinely may not need one.
+    return wordCount > 40 ? 40 : 60;
+  }
+
+  const penalty = pauses.reduce((sum, p) => {
+    if (p.classification === "long") return sum + PAUSE_PENALTY.long;
+    if (p.classification === "awkward") return sum + PAUSE_PENALTY.awkward;
+    return sum;
+  }, 0);
+
+  return Math.max(0, Math.round(100 - penalty));
+}
+
 export function analyzePauses(words: WordTimestamp[]): PauseAnalysis {
   const pauses: PauseInfo[] = [];
 
@@ -178,20 +222,69 @@ export function analyzePauses(words: WordTimestamp[]): PauseAnalysis {
   const longPauseCount = pauses.filter((p) => p.classification !== "natural").length;
   const avgPauseMs =
     pauses.length === 0 ? 0 : pauses.reduce((sum, p) => sum + p.durationMs, 0) / pauses.length;
+  const score = scorePauseQuality(pauses, words.length);
 
-  // Score: reward having *some* natural pauses (breath control, emphasis),
-  // penalize a high proportion of long/awkward ones, and penalize having
-  // essentially no pauses at all (rushing, no breath control) on a long take.
-  let score: number;
-  if (pauses.length === 0) {
-    // Never pausing at all is itself often a rushed/hesitant pattern, not a
-    // neutral default — penalized harder than before (was 55/80), still
-    // scaled down for very short takes that genuinely may not need one.
-    score = words.length > 40 ? 40 : 60;
-  } else {
-    const awkwardRatio = longPauseCount / pauses.length;
-    score = Math.max(0, Math.round(100 - awkwardRatio * 100));
+  return { pauses, pauseCount: pauses.length, longPauseCount, avgPauseMs, score };
+}
+
+/**
+ * Detects pauses from real microphone volume data (RMS sampled roughly
+ * every 150ms during recording) instead of word-level timestamps.
+ *
+ * Word timing is only ever an *approximation* — the browser's Speech
+ * Recognition API doesn't expose real per-word timestamps, so
+ * use-speech-session.ts estimates them by evenly spreading each finalized
+ * phrase's words across a guessed time span. That approximation has a
+ * blind spot: if a pause happens in the middle of a phrase the recognizer
+ * hasn't finalized yet, the eventual chunk's words get spread evenly
+ * across the *whole* span with no way to represent the pause that
+ * happened partway through it — the pause silently disappears.
+ *
+ * Volume is a real, continuous measurement sampled independently of
+ * whatever the speech recognizer is doing internally, so a genuine
+ * silence always shows up directly. This is the preferred pause-detection
+ * method whenever enough volume data exists (see session.service.ts for
+ * the fallback to the word-gap method when it doesn't).
+ */
+export function analyzePausesFromVolume(
+  volumeSamples: AudioSample[],
+  wordCount: number,
+): PauseAnalysis {
+  const sorted = [...volumeSamples].sort((a, b) => a.atMs - b.atMs);
+  const pauses: PauseInfo[] = [];
+  let silenceStartMs: number | null = null;
+
+  for (const sample of sorted) {
+    const isSilent = sample.value < SILENCE_RMS_THRESHOLD;
+    if (isSilent) {
+      if (silenceStartMs === null) silenceStartMs = sample.atMs;
+      continue;
+    }
+
+    if (silenceStartMs !== null) {
+      const durationMs = sample.atMs - silenceStartMs;
+      if (durationMs >= PAUSE_THRESHOLDS_MS.minGap) {
+        const classification: PauseClassification =
+          durationMs >= PAUSE_THRESHOLDS_MS.awkwardMin
+            ? "awkward"
+            : durationMs >= PAUSE_THRESHOLDS_MS.longMin
+              ? "long"
+              : "natural";
+        // No word-index concept on a timeline-based detection — the
+        // detailed pause list isn't persisted anyway (see session.service.ts).
+        pauses.push({ afterWordIndex: -1, startMs: silenceStartMs, durationMs, classification });
+      }
+      silenceStartMs = null;
+    }
   }
+  // A silence run still open at the end of the loop is trailing silence
+  // (the user stopped talking, then clicked stop) rather than a mid-speech
+  // pause, so it's intentionally not counted.
+
+  const longPauseCount = pauses.filter((p) => p.classification !== "natural").length;
+  const avgPauseMs =
+    pauses.length === 0 ? 0 : pauses.reduce((sum, p) => sum + p.durationMs, 0) / pauses.length;
+  const score = scorePauseQuality(pauses, wordCount);
 
   return { pauses, pauseCount: pauses.length, longPauseCount, avgPauseMs, score };
 }

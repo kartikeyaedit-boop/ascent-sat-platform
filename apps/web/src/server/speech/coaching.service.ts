@@ -37,6 +37,22 @@ export function generateCoachingFeedback(
   input: GenerateCoachingFeedbackInput,
 ): CoachingFeedbackContent {
   const { metrics } = input;
+
+  // No speech was detected at all — every score is forced to 0 by
+  // session.service.ts, and talking about pace/fillers/pauses that never
+  // happened would be actively confusing. Say plainly what happened instead.
+  if (metrics.wpm === 0) {
+    return {
+      summary:
+        "No speech was detected in this session (0/100) — make sure your microphone is active and try again.",
+      strengths: ["You started the session — next time, just make sure your mic is picking up your voice."],
+      weaknesses: ["No speech was detected at all, so there's nothing to evaluate yet."],
+      actionPlan: ["Check that your microphone is connected and not muted, then try recording again."],
+      practiceDrills: ["Do a quick mic check: say a sentence and confirm the live transcript shows your words before starting a full session."],
+      motivationalNote: "This one didn't count — no worries, just try again with your mic active.",
+    };
+  }
+
   const strengths: string[] = [];
   const weaknesses: string[] = [];
   const actionPlan: string[] = [];

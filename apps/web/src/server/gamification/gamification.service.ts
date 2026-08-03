@@ -232,7 +232,129 @@ export interface AchievementListItem {
   unlockedAt: Date | null;
 }
 
+/**
+ * Catches an account up on achievements it already qualifies for but never
+ * got credit for — e.g. sessions completed before an achievement existed,
+ * or before the milestone-check bug fix (===  vs >=, see achievements.ts).
+ * Replays the account's actual session history through the same check()
+ * functions used for live awarding, so there's no separate "backfill rules"
+ * to maintain. Run on-demand (achievements page load) rather than on every
+ * request — it's a full history scan, not a cheap lookup.
+ */
+async function backfillAchievements(userId: string): Promise<void> {
+  const [existingUnlocks, user, sessions] = await Promise.all([
+    prisma.userAchievement.findMany({
+      where: { userId },
+      select: { achievement: { select: { key: true } } },
+    }),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { longestStreak: true },
+    }),
+    prisma.speechSession.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        overallScore: true,
+        paceScore: true,
+        vocalVarietyScore: true,
+        clarityScore: true,
+        confidenceScore: true,
+        fillerWords: true,
+        durationSeconds: true,
+      },
+    }),
+  ]);
+
+  if (sessions.length === 0) return;
+
+  const alreadyUnlockedKeys = new Set(existingUnlocks.map((u) => u.achievement.key));
+  const newlyUnlockedKeys = new Set<string>();
+  let runningBest = 0;
+
+  for (let i = 0; i < sessions.length; i++) {
+    const s = sessions[i];
+    const fillerCount = Array.isArray(s.fillerWords) ? s.fillerWords.length : 0;
+
+    const ctx: AchievementContext = {
+      session: {
+        overallScore: s.overallScore,
+        wpm: 0,
+        fillerWordCount: fillerCount,
+        durationSeconds: s.durationSeconds,
+        confidenceScore: s.confidenceScore,
+        clarityScore: s.clarityScore,
+        paceScore: s.paceScore,
+        vocalVarietyScore: s.vocalVarietyScore,
+      },
+      stats: {
+        // Sessions-so-far as of this point in history, not the final total —
+        // this is what makes personal_best replay correctly (it requires
+        // more than one *prior* session) and it's what a milestone count
+        // achievement would have seen had it been evaluated live.
+        totalSessions: i + 1,
+        bestOverallScore: runningBest,
+        // Per-session historical streak isn't stored, so the account's
+        // peak-ever streak is the best available stand-in for "did this
+        // account ever reach an N-day streak".
+        currentStreak: user.longestStreak,
+        longestStreak: user.longestStreak,
+      },
+    };
+
+    const matched = checkNewlyUnlockedAchievements(
+      ctx,
+      new Set([...alreadyUnlockedKeys, ...newlyUnlockedKeys]),
+    );
+    for (const m of matched) newlyUnlockedKeys.add(m.key);
+
+    if (s.overallScore > runningBest) runningBest = s.overallScore;
+  }
+
+  const newlyUnlocked = ACHIEVEMENTS.filter((a) => newlyUnlockedKeys.has(a.key));
+  if (newlyUnlocked.length === 0) return;
+
+  const xpTotal = newlyUnlocked.reduce((sum, a) => sum + a.xpReward, 0);
+  const coinTotal = newlyUnlocked.reduce((sum, a) => sum + a.coinReward, 0);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { xp: { increment: xpTotal }, coins: { increment: coinTotal } },
+  });
+
+  await prisma.xPLog.createMany({
+    data: newlyUnlocked.map((a) => ({
+      userId,
+      amount: a.xpReward,
+      reason: `achievement:${a.key}`,
+    })),
+  });
+
+  const achievementRows = await Promise.all(
+    newlyUnlocked.map((a) =>
+      prisma.achievement.upsert({
+        where: { key: a.key },
+        update: {},
+        create: {
+          key: a.key,
+          name: a.name,
+          description: a.description,
+          icon: a.icon,
+          xpReward: a.xpReward,
+          coinReward: a.coinReward,
+        },
+      }),
+    ),
+  );
+  await prisma.userAchievement.createMany({
+    data: achievementRows.map((row) => ({ userId, achievementId: row.id })),
+    skipDuplicates: true,
+  });
+}
+
 export async function listAchievementsForUser(userId: string): Promise<AchievementListItem[]> {
+  await backfillAchievements(userId);
+
   const unlocks = await prisma.userAchievement.findMany({
     where: { userId },
     select: { unlockedAt: true, achievement: { select: { key: true } } },

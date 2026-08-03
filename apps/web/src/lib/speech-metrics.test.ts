@@ -4,11 +4,13 @@ import {
   scorePace,
   detectFillerWords,
   analyzePauses,
+  analyzePausesFromVolume,
   computeVocalVarietyScore,
   computeClarityScore,
   computeConfidenceScore,
   computeOverallScore,
   type WordTimestamp,
+  type AudioSample,
 } from "./speech-metrics";
 
 function word(text: string, startMs: number, endMs: number, confidence = 0.95): WordTimestamp {
@@ -48,6 +50,18 @@ describe("scorePace", () => {
 
   it("scores 0 wpm as 0", () => {
     expect(scorePace(0).score).toBe(0);
+  });
+
+  it("doesn't crater the score for a moderately slow but normal pace", () => {
+    // 90 wpm is a deliberate, unhurried pace — not a badly-run session.
+    const result = scorePace(90);
+    expect(result.label).toBe("slightly slow");
+    expect(result.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it("only reaches 0 at a genuinely extreme rate, not just outside the ideal band", () => {
+    expect(scorePace(80).score).toBeGreaterThan(0);
+    expect(scorePace(30).score).toBe(0);
   });
 });
 
@@ -106,6 +120,16 @@ describe("analyzePauses", () => {
     expect(result.pauses[0].classification).toBe("awkward");
   });
 
+  it("barely penalizes a single natural thinking pause, not a ratio-based zero", () => {
+    // A single 2s pause is 100% of this session's one pause — a ratio-based
+    // score would treat that as "100% of pauses were bad" and zero out the
+    // dimension, even though one deliberate pause is completely normal.
+    const words = [word("a", 0, 200), word("b", 2200, 2400)];
+    const result = analyzePauses(words);
+    expect(result.pauses[0].classification).toBe("long");
+    expect(result.score).toBeGreaterThanOrEqual(85);
+  });
+
   it("scores lower as the proportion of long/awkward pauses increases", () => {
     const allNatural = analyzePauses([
       word("a", 0, 200),
@@ -123,6 +147,57 @@ describe("analyzePauses", () => {
   it("penalizes never pausing at all on a long take rather than treating it as neutral", () => {
     const words = Array.from({ length: 50 }, (_, i) => word(`w${i}`, i * 200, i * 200 + 190));
     const result = analyzePauses(words);
+    expect(result.pauseCount).toBe(0);
+    expect(result.score).toBe(40);
+  });
+});
+
+function silentSample(atMs: number): AudioSample {
+  return { atMs, value: 0.001 };
+}
+function speakingSample(atMs: number): AudioSample {
+  return { atMs, value: 0.2 };
+}
+
+describe("analyzePausesFromVolume", () => {
+  it("detects a real pause from a run of low-volume samples between speech", () => {
+    const samples: AudioSample[] = [
+      ...Array.from({ length: 5 }, (_, i) => speakingSample(i * 150)), // 0-600ms speaking
+      ...Array.from({ length: 6 }, (_, i) => silentSample(750 + i * 150)), // ~900ms silence
+      ...Array.from({ length: 5 }, (_, i) => speakingSample(1650 + i * 150)), // speaking resumes
+    ];
+
+    const result = analyzePausesFromVolume(samples, 20);
+
+    expect(result.pauseCount).toBe(1);
+    expect(result.pauses[0].durationMs).toBeGreaterThanOrEqual(600);
+  });
+
+  it("does not count trailing silence at the end of the recording as a pause", () => {
+    const samples: AudioSample[] = [
+      ...Array.from({ length: 5 }, (_, i) => speakingSample(i * 150)),
+      ...Array.from({ length: 10 }, (_, i) => silentSample(750 + i * 150)),
+    ];
+
+    const result = analyzePausesFromVolume(samples, 10);
+
+    expect(result.pauseCount).toBe(0);
+  });
+
+  it("ignores gaps shorter than the natural-pause threshold", () => {
+    const samples: AudioSample[] = [
+      speakingSample(0),
+      silentSample(150), // only ~150ms of quiet
+      speakingSample(300),
+    ];
+
+    const result = analyzePausesFromVolume(samples, 10);
+    expect(result.pauseCount).toBe(0);
+  });
+
+  it("scores continuous speech with no pauses lower on a long take", () => {
+    const samples = Array.from({ length: 30 }, (_, i) => speakingSample(i * 150));
+    const result = analyzePausesFromVolume(samples, 50);
     expect(result.pauseCount).toBe(0);
     expect(result.score).toBe(40);
   });
