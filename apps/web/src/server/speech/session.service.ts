@@ -129,3 +129,37 @@ export async function getSessionForUser(sessionId: string, userId: string) {
 
   return session;
 }
+
+const SESSIONS_PAGE_SIZE = 10;
+
+export async function listSessionsForUser(userId: string, page: number) {
+  const skip = (page - 1) * SESSIONS_PAGE_SIZE;
+
+  const [sessions, total] = await Promise.all([
+    prisma.speechSession.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: SESSIONS_PAGE_SIZE,
+      select: {
+        id: true,
+        mode: true,
+        promptText: true,
+        durationSeconds: true,
+        wpm: true,
+        overallScore: true,
+        confidenceScore: true,
+        createdAt: true,
+      },
+    }),
+    prisma.speechSession.count({ where: { userId } }),
+  ]);
+
+  return {
+    sessions,
+    page,
+    pageSize: SESSIONS_PAGE_SIZE,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / SESSIONS_PAGE_SIZE)),
+  };
+}

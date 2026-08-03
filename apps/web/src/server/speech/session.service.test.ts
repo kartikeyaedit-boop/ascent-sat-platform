@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    speechSession: { create: vi.fn(), findUnique: vi.fn() },
+    speechSession: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     coachingFeedback: { create: vi.fn() },
   },
 }));
@@ -13,7 +13,7 @@ vi.mock("./coaching.service", () => ({
 
 import { prisma } from "@/lib/prisma";
 import { generateCoachingFeedback } from "./coaching.service";
-import { createSession, getSessionForUser } from "./session.service";
+import { createSession, getSessionForUser, listSessionsForUser } from "./session.service";
 import type { WordTimestamp } from "@/lib/speech-metrics";
 
 const mockedPrisma = vi.mocked(prisma, { deep: true });
@@ -106,5 +106,23 @@ describe("getSessionForUser", () => {
     } as never);
     const result = await getSessionForUser("session_1", "user_1");
     expect(result.id).toBe("session_1");
+  });
+});
+
+describe("listSessionsForUser", () => {
+  it("paginates and scopes the query to the requesting user", async () => {
+    mockedPrisma.speechSession.findMany.mockResolvedValue([{ id: "s1" }, { id: "s2" }] as never);
+    mockedPrisma.speechSession.count.mockResolvedValue(25 as never);
+
+    const result = await listSessionsForUser("user_1", 2);
+
+    const findManyArgs = mockedPrisma.speechSession.findMany.mock.calls[0]![0]!;
+    expect(findManyArgs.where).toEqual({ userId: "user_1" });
+    expect(findManyArgs.skip).toBe(10);
+    expect(findManyArgs.take).toBe(10);
+    expect(result.total).toBe(25);
+    expect(result.totalPages).toBe(3);
+    expect(result.page).toBe(2);
+    expect(result.sessions).toHaveLength(2);
   });
 });
