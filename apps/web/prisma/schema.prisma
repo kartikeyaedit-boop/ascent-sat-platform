@@ -122,6 +122,7 @@ model SpeechSession {
 model CoachingFeedback {
   id               String   @id @default(cuid())
   sessionId        String   @unique
+  summary          String   @default("") // short paragraph tying together overall level, top strength/weakness, and the top improvement action
   strengths        Json // string[]
   weaknesses       Json // string[]
   actionPlan       Json // string[]

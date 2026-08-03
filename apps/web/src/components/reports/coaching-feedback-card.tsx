@@ -61,6 +61,10 @@ export function CoachingFeedbackCard({
         <CardTitle className="text-base">Coaching feedback</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        <p className="rounded-lg border-l-4 border-primary bg-primary/5 p-3 text-sm leading-relaxed">
+          {feedback.summary}
+        </p>
+
         <FeedbackSection icon={ThumbsUp} title="Strengths" items={feedback.strengths} />
         <FeedbackSection icon={ThumbsDown} title="Weaknesses" items={feedback.weaknesses} />
         <FeedbackSection icon={ListChecks} title="Action plan" items={feedback.actionPlan} />

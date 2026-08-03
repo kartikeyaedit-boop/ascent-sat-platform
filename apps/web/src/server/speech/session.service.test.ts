@@ -65,6 +65,7 @@ beforeEach(() => {
 describe("createSession", () => {
   it("stores the session with server-computed scores, independent of feedback", async () => {
     mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "This was a solid session. Clear delivery. Could vary pace more. Practice pausing.",
       strengths: ["Clear delivery."],
       weaknesses: ["Could vary pace more."],
       actionPlan: ["Practice pausing."],
@@ -85,6 +86,7 @@ describe("createSession", () => {
 
   it("degrades to feedback: null instead of throwing when the feedback DB write fails", async () => {
     mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "This was a solid session. Clear delivery. Could vary pace more. Practice pausing.",
       strengths: ["Clear delivery."],
       weaknesses: ["Could vary pace more."],
       actionPlan: ["Practice pausing."],
@@ -101,6 +103,7 @@ describe("createSession", () => {
 
   it("includes gamification rewards from awardSessionRewards", async () => {
     mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "This was a session. Nice work.",
       strengths: [],
       weaknesses: [],
       actionPlan: [],
@@ -118,6 +121,7 @@ describe("createSession", () => {
 
   it("degrades to rewards: null instead of throwing when reward-awarding fails", async () => {
     mockedGenerateCoachingFeedback.mockReturnValue({
+      summary: "This was a session. Nice work.",
       strengths: [],
       weaknesses: [],
       actionPlan: [],

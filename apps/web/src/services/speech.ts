@@ -24,6 +24,7 @@ export interface SpeechSessionRecord {
 
 export interface CoachingFeedbackRecord {
   id: string;
+  summary: string;
   strengths: string[];
   weaknesses: string[];
   actionPlan: string[];

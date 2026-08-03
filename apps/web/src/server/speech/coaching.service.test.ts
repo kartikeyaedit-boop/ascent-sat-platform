@@ -28,6 +28,26 @@ describe("generateCoachingFeedback", () => {
     expect(result.motivationalNote.length).toBeGreaterThan(0);
   });
 
+  it("produces a summary mentioning the overall score, the top strength, and the top weakness", () => {
+    const result = generateCoachingFeedback(baseInput);
+    expect(result.summary).toContain(`${baseInput.metrics.overallScore}/100`);
+    expect(result.summary).toContain(result.strengths[0]);
+    expect(result.summary).toContain(result.weaknesses[0]);
+  });
+
+  it("labels a high-scoring session as excellent/strong and a low-scoring one as rough", () => {
+    const strong = generateCoachingFeedback({
+      ...baseInput,
+      metrics: { ...baseInput.metrics, overallScore: 90 },
+    });
+    const rough = generateCoachingFeedback({
+      ...baseInput,
+      metrics: { ...baseInput.metrics, overallScore: 25 },
+    });
+    expect(strong.summary).toMatch(/excellent|strong/);
+    expect(rough.summary).toMatch(/rough/);
+  });
+
   it("praises ideal pace as a strength", () => {
     const result = generateCoachingFeedback(baseInput);
     expect(result.strengths.some((s) => /ideal/.test(s))).toBe(true);

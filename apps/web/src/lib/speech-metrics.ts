@@ -184,7 +184,10 @@ export function analyzePauses(words: WordTimestamp[]): PauseAnalysis {
   // essentially no pauses at all (rushing, no breath control) on a long take.
   let score: number;
   if (pauses.length === 0) {
-    score = words.length > 40 ? 55 : 80; // only meaningfully penalize on longer speech
+    // Never pausing at all is itself often a rushed/hesitant pattern, not a
+    // neutral default — penalized harder than before (was 55/80), still
+    // scaled down for very short takes that genuinely may not need one.
+    score = words.length > 40 ? 40 : 60;
   } else {
     const awkwardRatio = longPauseCount / pauses.length;
     score = Math.max(0, Math.round(100 - awkwardRatio * 100));
@@ -260,14 +263,19 @@ export function computeConfidenceScore(input: {
   vocalVarietyScore: number;
   pace: PaceResult;
 }): ConfidenceResult {
+  // Filler words are one of the most perceptible signs of a rough delivery,
+  // so they're penalized more steeply (was *15) and weighted as the largest
+  // single factor below — previously pace carried the most weight, which
+  // let a session with heavy filler use score fine as long as pace happened
+  // to be in range.
   const fillerPer100Words = input.wordCount > 0 ? (input.fillerCount / input.wordCount) * 100 : 0;
-  const fillerScore = Math.max(0, Math.round(100 - fillerPer100Words * 15));
+  const fillerScore = Math.max(0, Math.round(100 - fillerPer100Words * 18));
 
   const score = Math.round(
-    input.paceScore * 0.35 +
-      fillerScore * 0.3 +
+    fillerScore * 0.35 +
+      input.paceScore * 0.25 +
       input.pauseScore * 0.2 +
-      input.vocalVarietyScore * 0.15,
+      input.vocalVarietyScore * 0.2,
   );
 
   const explanation: string[] = [];
@@ -305,10 +313,26 @@ export function computeOverallScore(scores: {
   paceScore: number;
   vocalVarietyScore: number;
 }): number {
-  return Math.round(
+  // Pace's weight here is intentionally smaller than it looks — it's also
+  // baked into confidenceScore (see computeConfidenceScore), so counting it
+  // heavily in both places let a good pace alone carry a mediocre session.
+  const weighted =
     scores.confidenceScore * 0.35 +
-      scores.clarityScore * 0.25 +
-      scores.paceScore * 0.2 +
-      scores.vocalVarietyScore * 0.2,
+    scores.clarityScore * 0.3 +
+    scores.paceScore * 0.15 +
+    scores.vocalVarietyScore * 0.2;
+
+  // A pure weighted average lets one badly-failing dimension hide behind
+  // decent scores elsewhere. Blending in the weakest component pulls the
+  // overall score down further whenever something is genuinely bad — closer
+  // to how a human listener would grade a session that's bad in one glaring
+  // way, rather than treating every dimension as independently forgivable.
+  const weakest = Math.min(
+    scores.confidenceScore,
+    scores.clarityScore,
+    scores.paceScore,
+    scores.vocalVarietyScore,
   );
+
+  return Math.round(weighted * 0.85 + weakest * 0.15);
 }

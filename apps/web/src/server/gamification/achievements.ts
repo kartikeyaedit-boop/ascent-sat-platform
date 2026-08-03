@@ -47,7 +47,11 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Footprints",
     xpReward: 20,
     coinReward: 10,
-    check: (ctx) => ctx.stats.totalSessions === 1,
+    // >= rather than === : an account with pre-existing sessions from
+    // before an achievement existed would otherwise sail past the exact
+    // count and never unlock it. Safe because checkNewlyUnlockedAchievements
+    // already filters out anything already unlocked.
+    check: (ctx) => ctx.stats.totalSessions >= 1,
   },
   {
     key: "five_sessions",
@@ -56,7 +60,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Flame",
     xpReward: 30,
     coinReward: 15,
-    check: (ctx) => ctx.stats.totalSessions === 5,
+    check: (ctx) => ctx.stats.totalSessions >= 5,
   },
   {
     key: "twenty_five_sessions",
@@ -65,7 +69,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Award",
     xpReward: 75,
     coinReward: 40,
-    check: (ctx) => ctx.stats.totalSessions === 25,
+    check: (ctx) => ctx.stats.totalSessions >= 25,
   },
   {
     key: "hundred_sessions",
@@ -74,7 +78,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Trophy",
     xpReward: 200,
     coinReward: 100,
-    check: (ctx) => ctx.stats.totalSessions === 100,
+    check: (ctx) => ctx.stats.totalSessions >= 100,
   },
   {
     key: "perfect_score",
@@ -119,7 +123,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Zap",
     xpReward: 25,
     coinReward: 15,
-    check: (ctx) => ctx.stats.currentStreak === 3,
+    check: (ctx) => ctx.stats.currentStreak >= 3,
   },
   {
     key: "streak_7",
@@ -128,7 +132,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "CalendarCheck",
     xpReward: 60,
     coinReward: 30,
-    check: (ctx) => ctx.stats.currentStreak === 7,
+    check: (ctx) => ctx.stats.currentStreak >= 7,
   },
   {
     key: "streak_30",
@@ -137,7 +141,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "Rocket",
     xpReward: 300,
     coinReward: 150,
-    check: (ctx) => ctx.stats.currentStreak === 30,
+    check: (ctx) => ctx.stats.currentStreak >= 30,
   },
   {
     key: "pace_master",

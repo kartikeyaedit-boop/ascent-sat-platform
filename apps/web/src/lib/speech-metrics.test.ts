@@ -119,6 +119,13 @@ describe("analyzePauses", () => {
     ]);
     expect(allNatural.score).toBeGreaterThan(allAwkward.score);
   });
+
+  it("penalizes never pausing at all on a long take rather than treating it as neutral", () => {
+    const words = Array.from({ length: 50 }, (_, i) => word(`w${i}`, i * 200, i * 200 + 190));
+    const result = analyzePauses(words);
+    expect(result.pauseCount).toBe(0);
+    expect(result.score).toBe(40);
+  });
 });
 
 describe("computeVocalVarietyScore", () => {
@@ -204,6 +211,30 @@ describe("computeConfidenceScore", () => {
 
     expect(good.score).toBeGreaterThan(bad.score);
   });
+
+  it("weighs heavy filler use as more damaging than a bad pace", () => {
+    const perfectPace = scorePace(140);
+    const heavyFillers = computeConfidenceScore({
+      paceScore: perfectPace.score,
+      fillerCount: 10,
+      wordCount: 100,
+      pauseScore: 100,
+      vocalVarietyScore: 100,
+      pace: perfectPace,
+    });
+
+    const badPace = scorePace(240);
+    const noFillers = computeConfidenceScore({
+      paceScore: badPace.score,
+      fillerCount: 0,
+      wordCount: 100,
+      pauseScore: 100,
+      vocalVarietyScore: 100,
+      pace: badPace,
+    });
+
+    expect(noFillers.score).toBeGreaterThan(heavyFillers.score);
+  });
 });
 
 describe("computeOverallScore", () => {
@@ -226,5 +257,17 @@ describe("computeOverallScore", () => {
     });
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it("pulls the score down further than a plain weighted average when one dimension is badly failing", () => {
+    const score = computeOverallScore({
+      confidenceScore: 90,
+      clarityScore: 90,
+      paceScore: 90,
+      vocalVarietyScore: 10,
+    });
+    // A pure weighted average (0.35/0.3/0.15/0.2) of these would land at 74 —
+    // the weakest-link blend should pull it noticeably below that.
+    expect(score).toBeLessThan(70);
   });
 });

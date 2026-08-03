@@ -8,6 +8,7 @@
  */
 
 export interface CoachingFeedbackContent {
+  summary: string;
   strengths: string[];
   weaknesses: string[];
   actionPlan: string[];
@@ -126,5 +127,30 @@ export function generateCoachingFeedback(
         ? "Solid foundation here. The specific fixes above are small adjustments, not a rebuild."
         : "Every speaker starts somewhere — you showed up and spoke, which is the actual hard part. The rest is just reps.";
 
-  return { strengths, weaknesses, actionPlan, practiceDrills, motivationalNote };
+  const summary = buildSummary(metrics.overallScore, strengths[0], weaknesses[0], actionPlan[0]);
+
+  return { summary, strengths, weaknesses, actionPlan, practiceDrills, motivationalNote };
+}
+
+function overallLevelPhrase(overallScore: number): string {
+  if (overallScore >= 85) return "an excellent session";
+  if (overallScore >= 70) return "a strong session";
+  if (overallScore >= 50) return "a developing session";
+  return "a rough session";
+}
+
+/**
+ * A short paragraph tying the detailed breakdown together — overall level,
+ * top strength, top weakness, and the single highest-impact next step — so
+ * there's one place that reads like actual coaching rather than four
+ * separate lists. Strengths/weaknesses/actionPlan are guaranteed non-empty
+ * by the fallback-filling above, so indexing [0] here is always safe.
+ */
+function buildSummary(
+  overallScore: number,
+  topStrength: string,
+  topWeakness: string,
+  topAction: string,
+): string {
+  return `This was ${overallLevelPhrase(overallScore)} (${overallScore}/100). ${topStrength} ${topWeakness} ${topAction}`;
 }

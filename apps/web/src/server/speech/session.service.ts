@@ -104,6 +104,7 @@ export async function createSession(input: CreateSessionInput) {
     coachingFeedback = await prisma.coachingFeedback.create({
       data: {
         sessionId: session.id,
+        summary: feedback.summary,
         strengths: feedback.strengths,
         weaknesses: feedback.weaknesses,
         actionPlan: feedback.actionPlan,
