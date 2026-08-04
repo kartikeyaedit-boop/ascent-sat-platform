@@ -81,7 +81,7 @@ export default function RegisterPage() {
       <CardHeader>
         <CardTitle>Create your account</CardTitle>
         <CardDescription>
-          Start studying for free — no credit card required.
+          Start practicing for free — no credit card required.
         </CardDescription>
       </CardHeader>
       <CardContent>

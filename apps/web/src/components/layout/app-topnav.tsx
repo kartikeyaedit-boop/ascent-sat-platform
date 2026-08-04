@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { useLogout } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/auth-store";
 import { useGamificationSummary } from "@/hooks/use-gamification";
@@ -33,7 +34,8 @@ export function AppTopNav() {
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur sm:px-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <MobileNav />
         <div
           className="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-sm font-semibold text-orange-500"
           title={
