@@ -108,14 +108,18 @@ export function useSpeechSession(mode: string, promptText?: string) {
   const pitchSamplesRef = useRef<AudioSample[]>([]);
   const volumeSamplesRef = useRef<AudioSample[]>([]);
   const claritySamplesRef = useRef<AudioSample[]>([]);
+  const hasResultRef = useRef(false);
+  const stuckCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanup = useCallback(() => {
     shouldBeRecordingRef.current = false;
 
     if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current);
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (stuckCheckTimeoutRef.current) clearTimeout(stuckCheckTimeoutRef.current);
     analysisIntervalRef.current = null;
     timerIntervalRef.current = null;
+    stuckCheckTimeoutRef.current = null;
 
     if (recognitionRef.current) {
       recognitionRef.current.onend = null;
@@ -141,6 +145,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
     volumeSamplesRef.current = [];
     claritySamplesRef.current = [];
     lastChunkEndMsRef.current = 0;
+    hasResultRef.current = false;
     setInterimText("");
     setLiveWpm(0);
     setLiveFillerCount(0);
@@ -171,6 +176,7 @@ export function useSpeechSession(mode: string, promptText?: string) {
       recognition.lang = "en-US";
 
       recognition.onresult = (event) => {
+        hasResultRef.current = true;
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           const alt = result[0];
@@ -282,6 +288,27 @@ export function useSpeechSession(mode: string, promptText?: string) {
 
       recognition.start();
       recognitionRef.current = recognition;
+
+      // iOS's speech engine can get stuck at the OS/process level after
+      // prior use and silently never deliver a single onresult — no
+      // error, no interim text, nothing — a documented WebKit limitation
+      // that no amount of restarting or reloading from JS can reach. If
+      // there's clearly real audio (our own volume samples, independent
+      // of recognition) but zero results after a few seconds, say so
+      // instead of leaving the user staring at a transcript that will
+      // never fill in.
+      if (onIOS) {
+        stuckCheckTimeoutRef.current = setTimeout(() => {
+          const hasRealAudio = volumeSamplesRef.current.some(
+            (s) => s.value >= SILENCE_RMS_THRESHOLD,
+          );
+          if (shouldBeRecordingRef.current && !hasResultRef.current && hasRealAudio) {
+            setErrorMessage(
+              "Speech recognition isn't picking up your voice on this attempt — a known iPhone/Safari issue after it's already been used once. Your pace and tone scoring will still work, but the transcript may stay empty. Fully closing and reopening the browser (swipe it away in the app switcher, not just a reload) usually fixes it, or try Chrome on Android/desktop for the most reliable experience.",
+            );
+          }
+        }, 7000);
+      }
 
       timerIntervalRef.current = setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
