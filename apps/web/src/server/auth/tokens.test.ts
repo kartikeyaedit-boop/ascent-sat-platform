@@ -4,6 +4,8 @@ import {
   verifyAccessToken,
   generateOpaqueToken,
   hashOpaqueToken,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
 } from "./tokens";
 
 describe("access tokens", () => {
@@ -50,5 +52,25 @@ describe("opaque tokens", () => {
   it("never stores the raw value inside the hash", () => {
     const { raw, hash } = generateOpaqueToken();
     expect(hash).not.toContain(raw);
+  });
+});
+
+describe("recovery codes", () => {
+  it("generates a code in XXXX-XXXX-XXXX-XXXX form with no ambiguous characters", () => {
+    const code = generateRecoveryCode();
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(code).not.toMatch(/[01OI]/);
+  });
+
+  it("generates unique codes on each call", () => {
+    const a = generateRecoveryCode();
+    const b = generateRecoveryCode();
+    expect(a).not.toBe(b);
+  });
+
+  it("normalizes dashes and case so a hand-retyped code still matches", () => {
+    const code = generateRecoveryCode();
+    const retyped = code.toLowerCase().replace(/-/g, " ");
+    expect(normalizeRecoveryCode(retyped)).toBe(normalizeRecoveryCode(code));
   });
 });

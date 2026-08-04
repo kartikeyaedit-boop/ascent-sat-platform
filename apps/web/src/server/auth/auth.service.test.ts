@@ -32,7 +32,15 @@ vi.mock("./mailer", () => ({
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "./mailer";
 import { hashPassword } from "./password";
-import { registerUser, loginUser, refreshSession, changePassword } from "./auth.service";
+import { hashOpaqueToken, normalizeRecoveryCode } from "./tokens";
+import {
+  registerUser,
+  loginUser,
+  refreshSession,
+  changePassword,
+  resetPasswordWithRecoveryCode,
+  regenerateRecoveryCode,
+} from "./auth.service";
 
 const mockedPrisma = vi.mocked(prisma, { deep: true });
 
@@ -50,6 +58,7 @@ const baseUser = {
   lastPracticeDate: null,
   equippedTitleId: null,
   equippedPetId: null,
+  recoveryCodeHash: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   passwordHash: "",
@@ -77,16 +86,19 @@ describe("registerUser", () => {
     mockedPrisma.user.create.mockResolvedValue(baseUser);
     mockedPrisma.emailVerificationToken.create.mockResolvedValue({} as never);
 
-    const user = await registerUser({
+    const result = await registerUser({
       email: baseUser.email,
       password: "Password1",
       name: "Jane Doe",
     });
 
-    expect(user.email).toBe(baseUser.email);
-    expect(user.emailVerified).toBe(true);
+    expect(result.user.email).toBe(baseUser.email);
+    expect(result.user.emailVerified).toBe(true);
+    expect(result.recoveryCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     expect(mockedPrisma.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ emailVerified: true }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ emailVerified: true, recoveryCodeHash: expect.any(String) }),
+      }),
     );
     expect(sendEmail).toHaveBeenCalledOnce();
   });
@@ -101,14 +113,14 @@ describe("registerUser", () => {
     mockedPrisma.emailVerificationToken.create.mockResolvedValue({} as never);
     vi.mocked(sendEmail).mockRejectedValueOnce(new Error("Resend API error (403)"));
 
-    const user = await registerUser({
+    const result = await registerUser({
       email: baseUser.email,
       password: "Password1",
       name: "Jane Doe",
     });
 
-    expect(user.email).toBe(baseUser.email);
-    expect(user.emailVerified).toBe(true);
+    expect(result.user.email).toBe(baseUser.email);
+    expect(result.user.emailVerified).toBe(true);
   });
 });
 
@@ -188,6 +200,65 @@ describe("changePassword", () => {
     );
     expect(mockedPrisma.refreshToken.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: baseUser.id, revokedAt: null } }),
+    );
+  });
+});
+
+describe("resetPasswordWithRecoveryCode", () => {
+  it("throws INVALID_TOKEN for an unknown email", async () => {
+    mockedPrisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      resetPasswordWithRecoveryCode("nobody@example.com", "AAAA-BBBB-CCCC-DDDD", "NewPassword1"),
+    ).rejects.toMatchObject({ code: "INVALID_TOKEN" });
+  });
+
+  it("throws INVALID_TOKEN for a wrong code", async () => {
+    const recoveryCodeHash = hashOpaqueToken(normalizeRecoveryCode("AAAA-BBBB-CCCC-DDDD"));
+    mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, recoveryCodeHash });
+
+    await expect(
+      resetPasswordWithRecoveryCode(baseUser.email, "WRONG-CODE-HERE-0000", "NewPassword1"),
+    ).rejects.toMatchObject({ code: "INVALID_TOKEN" });
+  });
+
+  it("resets the password, rotates the code, and revokes sessions on success", async () => {
+    const recoveryCodeHash = hashOpaqueToken(normalizeRecoveryCode("AAAA-BBBB-CCCC-DDDD"));
+    mockedPrisma.user.findUnique.mockResolvedValue({ ...baseUser, recoveryCodeHash });
+    mockedPrisma.user.update.mockResolvedValue({} as never);
+    mockedPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 } as never);
+
+    const result = await resetPasswordWithRecoveryCode(
+      baseUser.email,
+      "aaaa-bbbb-cccc-dddd", // lowercase, same code — should still match
+      "NewPassword1",
+    );
+
+    expect(result.recoveryCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(result.recoveryCode).not.toBe("AAAA-BBBB-CCCC-DDDD");
+    expect(mockedPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ passwordHash: expect.any(String), recoveryCodeHash: expect.any(String) }),
+      }),
+    );
+    expect(mockedPrisma.refreshToken.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: baseUser.id, revokedAt: null } }),
+    );
+  });
+});
+
+describe("regenerateRecoveryCode", () => {
+  it("returns a freshly generated code and persists its hash", async () => {
+    mockedPrisma.user.update.mockResolvedValue({} as never);
+
+    const code = await regenerateRecoveryCode(baseUser.id);
+
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(mockedPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: baseUser.id },
+        data: { recoveryCodeHash: hashOpaqueToken(normalizeRecoveryCode(code)) },
+      }),
     );
   });
 });

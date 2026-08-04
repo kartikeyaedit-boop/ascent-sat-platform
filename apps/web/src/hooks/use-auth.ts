@@ -85,3 +85,11 @@ export function useResetPassword() {
 export function useChangePassword() {
   return useMutation({ mutationFn: authService.changePassword });
 }
+
+export function useResetPasswordWithRecoveryCode() {
+  return useMutation({ mutationFn: authService.resetPasswordWithRecoveryCode });
+}
+
+export function useRegenerateRecoveryCode() {
+  return useMutation({ mutationFn: authService.regenerateRecoveryCode });
+}

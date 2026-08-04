@@ -84,11 +84,26 @@ get stored — client-reported numbers are never trusted directly).
 
 ## Auth model
 
-Unchanged from before the pivot — this part of the app is fully generic.
-JWT access token (15 min, `jose`) + rotating opaque refresh token (30 days)
-in httpOnly cookies. See `src/server/auth/**` and `src/lib/auth-server.ts`.
-Middleware does a cheap cookie-presence check for UX; real enforcement is
-`requireUser()` on every protected route/page.
+Mostly unchanged from before the pivot — JWT access token (15 min,
+`jose`) + rotating opaque refresh token (30 days) in httpOnly cookies. See
+`src/server/auth/**` and `src/lib/auth-server.ts`. Middleware does a cheap
+cookie-presence check for UX; real enforcement is `requireUser()` on
+every protected route/page.
+
+**Email delivery is unreliable on this deployment** — the transactional
+email provider only reliably reaches the account it's configured under,
+not arbitrary recipients (a common restriction on free/unverified-domain
+email tiers). Two things follow from that:
+
+- Accounts are verified immediately at registration rather than gated on
+  clicking an emailed link — see `registerUser` in `auth.service.ts`.
+- Password recovery has a real, working path that doesn't depend on email
+  at all: a one-time recovery code, shown once at registration, hashed
+  (never stored in plaintext) and rotated on every use. The email-link
+  reset flow still exists as a secondary option (`/forgot-password/email-link`)
+  in case delivery ever becomes reliable, but the recovery code is the
+  one guaranteed to work. See `resetPasswordWithRecoveryCode` and
+  `regenerateRecoveryCode` in `auth.service.ts`.
 
 ## Scoring approach (why rule-based, not "AI magic")
 
@@ -101,8 +116,14 @@ which the product explicitly should never do):
   timestamps described above.
 - **Filler words**: dictionary match against the transcript, with
   timestamps.
-- **Pauses**: gaps between consecutive word timestamps, classified as
-  natural / long / awkward by duration.
+- **Pauses**: detected from real silence in the mic's volume signal (RMS,
+  ~150ms samples) whenever there's enough of it to trust — a genuine
+  measurement, unlike the approximated word timestamps, which can't
+  represent a pause that happens inside an unfinalized phrase. Falls back
+  to word-timestamp gaps only when volume data is too sparse. Classified
+  as natural / long / awkward by duration; scored by a per-pause severity
+  penalty rather than a ratio, so one normal pause doesn't zero out the
+  whole dimension. See `analyzePausesFromVolume` in `speech-metrics.ts`.
 - **Pitch & volume variance**: sampled client-side via the Web Audio API's
   `AnalyserNode` (~every 150ms) — this part is a real, precise measurement
   regardless of the STT approximation above, since it reads the raw audio

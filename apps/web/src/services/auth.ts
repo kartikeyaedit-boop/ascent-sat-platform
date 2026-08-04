@@ -10,7 +10,7 @@ export function register(input: {
   password: string;
   name: string;
 }) {
-  return apiFetch<{ user: PublicUser }>("/api/auth/register", {
+  return apiFetch<{ user: PublicUser; recoveryCode: string }>("/api/auth/register", {
     method: "POST",
     body: input,
   });
@@ -59,5 +59,22 @@ export function changePassword(input: { currentPassword: string; newPassword: st
   return apiFetch<{ ok: true }>("/api/auth/change-password", {
     method: "POST",
     body: input,
+  });
+}
+
+export function resetPasswordWithRecoveryCode(input: {
+  email: string;
+  recoveryCode: string;
+  password: string;
+}) {
+  return apiFetch<{ recoveryCode: string }>("/api/auth/reset-password-with-code", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function regenerateRecoveryCode() {
+  return apiFetch<{ recoveryCode: string }>("/api/auth/recovery-code/regenerate", {
+    method: "POST",
   });
 }

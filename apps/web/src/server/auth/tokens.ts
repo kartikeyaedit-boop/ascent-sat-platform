@@ -61,3 +61,24 @@ export function generateOpaqueToken(): { raw: string; hash: string } {
 export function hashOpaqueToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
+
+/** Excludes visually-ambiguous characters (0/O, 1/I) since this gets
+ * hand-typed back in during account recovery. */
+const RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** A human-typable one-time-display secret (~80 bits of entropy), shown
+ * once and never stored in plaintext — see recoveryCodeHash on User. */
+export function generateRecoveryCode(): string {
+  const bytes = randomBytes(16);
+  let raw = "";
+  for (let i = 0; i < bytes.length; i++) {
+    raw += RECOVERY_CODE_ALPHABET[bytes[i] % RECOVERY_CODE_ALPHABET.length];
+  }
+  return raw.match(/.{1,4}/g)!.join("-");
+}
+
+/** Case- and formatting-insensitive: the user may retype it without dashes
+ * or in lowercase, so both generation and verification hash this form. */
+export function normalizeRecoveryCode(code: string): string {
+  return code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}

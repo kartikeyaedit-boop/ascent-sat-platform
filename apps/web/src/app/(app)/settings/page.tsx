@@ -1,4 +1,5 @@
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { RecoveryCodeCard } from "@/components/settings/recovery-code-card";
 
 export default function SettingsPage() {
   return (
@@ -9,6 +10,7 @@ export default function SettingsPage() {
       </div>
 
       <ChangePasswordForm />
+      <RecoveryCodeCard />
     </div>
   );
 }

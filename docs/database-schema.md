@@ -2,11 +2,14 @@
 
 Schema lives at [`apps/web/prisma/schema.prisma`](../apps/web/prisma/schema.prisma).
 
-## Identity (unchanged from before the pivot)
+## Identity
 
 `User`, `RefreshToken`, `EmailVerificationToken`, `PasswordResetToken` —
-fully generic auth tables, no changes needed for the new product. See
-[architecture.md](./architecture.md) for the auth model.
+generic auth tables, mostly unchanged from before the pivot. `User` also
+has `recoveryCodeHash` (SHA-256, never the plaintext code) backing the
+email-independent password recovery flow — see
+[architecture.md](./architecture.md) for why that exists and the auth
+model in general.
 
 ## Speech domain (Phase 1)
 

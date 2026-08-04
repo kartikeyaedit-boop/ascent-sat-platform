@@ -5,6 +5,8 @@ import { hashPassword, verifyPassword } from "./password";
 import {
   generateOpaqueToken,
   hashOpaqueToken,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
   signAccessToken,
   verifyAccessToken,
   REFRESH_TOKEN_TTL_MS,
@@ -80,21 +82,30 @@ export async function registerUser(input: {
   email: string;
   password: string;
   name: string;
-}): Promise<PublicUser> {
+}): Promise<{ user: PublicUser; recoveryCode: string }> {
   const existing = await prisma.user.findUnique({
     where: { email: input.email },
   });
   if (existing) throw AuthErrors.emailTaken();
 
   const passwordHash = await hashPassword(input.password);
+  const recoveryCode = generateRecoveryCode();
+  const recoveryCodeHash = hashOpaqueToken(normalizeRecoveryCode(recoveryCode));
+
   // Accounts are verified immediately rather than gated on clicking an
-  // emailed link: this app's transactional email (Resend, no verified
-  // sending domain) can only actually deliver to the Resend account
-  // owner's own address — every other recipient gets rejected. Gating
-  // login on a link that can't be delivered would lock out every real
-  // signup, so verification isn't a login requirement here.
+  // emailed link: this app's transactional email can't reliably reach
+  // arbitrary recipients (see mailer.ts). Gating login on a link that
+  // can't be delivered would lock out every real signup, so verification
+  // isn't a login requirement here. The recovery code below is the real,
+  // working account-recovery mechanism — see resetPasswordWithRecoveryCode.
   const user = await prisma.user.create({
-    data: { email: input.email, passwordHash, name: input.name, emailVerified: true },
+    data: {
+      email: input.email,
+      passwordHash,
+      name: input.name,
+      emailVerified: true,
+      recoveryCodeHash,
+    },
   });
 
   // Still attempt a welcome email as a best-effort nicety — if a real
@@ -106,7 +117,7 @@ export async function registerUser(input: {
     console.error(`Welcome email failed to send for ${user.email}:`, err);
   }
 
-  return toPublicUser(user);
+  return { user: toPublicUser(user), recoveryCode };
 }
 
 export async function loginUser(input: {
@@ -255,6 +266,52 @@ export async function resetPassword(
       data: { revokedAt: new Date() },
     }),
   ]);
+}
+
+/**
+ * Resets a password using the one-time recovery code shown at registration
+ * — no email involved at all, unlike requestPasswordReset above. Rotates
+ * the code on every successful use (and returns the new one) so a code
+ * can't be replayed, and revokes existing sessions like any password reset.
+ */
+export async function resetPasswordWithRecoveryCode(
+  email: string,
+  recoveryCode: string,
+  newPassword: string,
+): Promise<{ recoveryCode: string }> {
+  const user = await prisma.user.findUnique({ where: { email } });
+  // Same generic failure for "no such account" and "wrong code" — don't
+  // give an attacker a way to distinguish valid emails from invalid ones.
+  if (!user || !user.recoveryCodeHash) throw AuthErrors.invalidOrExpiredToken();
+
+  const providedHash = hashOpaqueToken(normalizeRecoveryCode(recoveryCode));
+  if (providedHash !== user.recoveryCodeHash) throw AuthErrors.invalidOrExpiredToken();
+
+  const passwordHash = await hashPassword(newPassword);
+  const newRecoveryCode = generateRecoveryCode();
+  const newRecoveryCodeHash = hashOpaqueToken(normalizeRecoveryCode(newRecoveryCode));
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, recoveryCodeHash: newRecoveryCodeHash },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+
+  return { recoveryCode: newRecoveryCode };
+}
+
+/** Lets a logged-in user get a fresh recovery code anytime (e.g. they lost
+ * the one from registration) — immediately invalidates the old one. */
+export async function regenerateRecoveryCode(userId: string): Promise<string> {
+  const recoveryCode = generateRecoveryCode();
+  const recoveryCodeHash = hashOpaqueToken(normalizeRecoveryCode(recoveryCode));
+  await prisma.user.update({ where: { id: userId }, data: { recoveryCodeHash } });
+  return recoveryCode;
 }
 
 /**

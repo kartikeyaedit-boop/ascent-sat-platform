@@ -45,6 +45,11 @@ model User {
   lastPracticeDate DateTime?
   equippedTitleId  String?
   equippedPetId    String?
+  // Hash of a one-time-display recovery code, shown once at registration
+  // (and re-issued on every use/regeneration) — lets a user reset their
+  // own password without depending on transactional email, which this
+  // deployment can't reliably deliver. See auth.service.ts.
+  recoveryCodeHash String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

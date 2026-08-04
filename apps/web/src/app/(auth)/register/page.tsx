@@ -25,6 +25,7 @@ import {
 import { registerSchema } from "@/server/auth/validation";
 import { useRegister } from "@/hooks/use-auth";
 import { ApiClientError } from "@/types/api";
+import { RecoveryCodeDisplay } from "@/components/auth/recovery-code-display";
 
 type RegisterValues = {
   name: string;
@@ -33,7 +34,7 @@ type RegisterValues = {
 };
 
 export default function RegisterPage() {
-  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [result, setResult] = useState<{ email: string; recoveryCode: string } | null>(null);
   const registerMutation = useRegister();
 
   const form = useForm<RegisterValues>({
@@ -43,8 +44,8 @@ export default function RegisterPage() {
 
   async function onSubmit(values: RegisterValues) {
     try {
-      const { user } = await registerMutation.mutateAsync(values);
-      setSubmittedEmail(user.email);
+      const { user, recoveryCode } = await registerMutation.mutateAsync(values);
+      setResult({ email: user.email, recoveryCode });
     } catch (err) {
       const message =
         err instanceof ApiClientError ? err.message : "Something went wrong.";
@@ -52,7 +53,7 @@ export default function RegisterPage() {
     }
   }
 
-  if (submittedEmail) {
+  if (result) {
     return (
       <Card>
         <CardHeader className="items-center text-center">
@@ -61,11 +62,12 @@ export default function RegisterPage() {
           </div>
           <CardTitle className="mt-2">Account created</CardTitle>
           <CardDescription>
-            <strong>{submittedEmail}</strong> is ready to go — you can log in
+            <strong>{result.email}</strong> is ready to go — you can log in
             right away.
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center">
+        <CardContent className="space-y-4">
+          <RecoveryCodeDisplay code={result.recoveryCode} />
           <Button asChild className="w-full">
             <Link href="/login">Log in</Link>
           </Button>

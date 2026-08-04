@@ -4,12 +4,25 @@ Base path: `/api`. All responses are `{ "data": T }` or
 `{ "error": { "code": string, "message": string } }`. Auth via httpOnly
 cookies, no `Authorization` header.
 
-## Auth (unchanged from before the pivot)
+## Auth
 
-`/api/auth/{register,login,logout,refresh,verify-email,resend-verification,forgot-password,reset-password}`
+`/api/auth/{register,login,logout,refresh,verify-email,resend-verification,forgot-password,reset-password,change-password}`
 and `/api/me` — fully generic, see [architecture.md](./architecture.md).
 `/api/test/last-email` remains for E2E testing, gated behind
 `ENABLE_TEST_ENDPOINTS=true`.
+
+Two additions specific to this deployment's email limitations (see
+`docs/architecture.md` — transactional email can't reliably reach
+arbitrary recipients):
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| POST | `/api/auth/reset-password-with-code` | `{ email, recoveryCode, password }` | Resets a password using the one-time code shown at registration — no email involved. Rotates the code on success and returns the new one; the old code stops working immediately. |
+| POST | `/api/auth/recovery-code/regenerate` | — (auth required) | Issues a fresh recovery code for the logged-in user, invalidating the old one. |
+
+`POST /api/auth/register` additionally returns `{ user, recoveryCode }` —
+the code is shown to the user exactly once and never stored in plaintext
+or emailed.
 
 ## Speech (Phase 1)
 

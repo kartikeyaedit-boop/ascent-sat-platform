@@ -15,6 +15,6 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   }
 
   const body = registerSchema.parse(await request.json());
-  const user = await registerUser(body);
-  return apiSuccess({ user }, 201);
+  const { user, recoveryCode } = await registerUser(body);
+  return apiSuccess({ user, recoveryCode }, 201);
 });

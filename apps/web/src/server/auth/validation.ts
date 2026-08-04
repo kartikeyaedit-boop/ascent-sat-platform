@@ -40,3 +40,9 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: passwordSchema,
 });
+
+export const resetWithRecoveryCodeSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  recoveryCode: z.string().min(1, "Recovery code is required"),
+  password: passwordSchema,
+});
