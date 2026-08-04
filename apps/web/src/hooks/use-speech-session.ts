@@ -72,6 +72,20 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+// All browsers on iOS (Safari, Chrome, Firefox, etc.) run on Apple's WebKit
+// engine, and WebKit's SpeechRecognition is documented to silently stop
+// delivering results in continuous mode — see
+// https://github.com/WICG/speech-api/issues/96. The stable pattern there
+// is continuous=false plus a manual restart on every `onend`, which is
+// what this hook already does for the "browser ended recognition on a
+// pause" case below; iOS just needs it as the primary mechanism instead
+// of a rarely-hit fallback, with a short delay so the native audio
+// session has a moment to actually release between restarts.
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+const IOS_RESTART_DELAY_MS = 300;
+
 export function useSpeechSession(mode: string, promptText?: string) {
   const router = useRouter();
 
@@ -150,8 +164,9 @@ export function useSpeechSession(mode: string, promptText?: string) {
       startTimeRef.current = Date.now();
       shouldBeRecordingRef.current = true;
 
+      const onIOS = isIOS();
       const recognition = new RecognitionCtor();
-      recognition.continuous = true;
+      recognition.continuous = !onIOS;
       recognition.interimResults = true;
       recognition.lang = "en-US";
 
@@ -205,20 +220,36 @@ export function useSpeechSession(mode: string, promptText?: string) {
       };
 
       // Some browsers end recognition after a pause even with continuous=true.
-      // Restart automatically as long as the user hasn't clicked stop.
+      // On iOS this fires after every finalized phrase (continuous=false
+      // there, see isIOS() above) rather than just on real pauses, so it's
+      // the main restart mechanism there, not a rare fallback — restart
+      // with a short delay to give WebKit's audio session a moment to
+      // actually release before grabbing it again.
       recognition.onend = () => {
-        if (shouldBeRecordingRef.current) recognition.start();
+        if (!shouldBeRecordingRef.current) return;
+        if (onIOS) {
+          setTimeout(() => {
+            if (shouldBeRecordingRef.current) recognition.start();
+          }, IOS_RESTART_DELAY_MS);
+        } else {
+          recognition.start();
+        }
       };
 
-      recognition.start();
-      recognitionRef.current = recognition;
-
+      // Create (and explicitly resume) the AudioContext before starting
+      // recognition — on iOS, unlocking the audio session up front like
+      // this makes the speech engine noticeably more likely to actually
+      // pick up audio on this attempt, per the community-documented
+      // stabilization tips linked above.
       const AudioContextCtor =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext })
           .webkitAudioContext;
       const audioContext = new AudioContextCtor();
       audioContextRef.current = audioContext;
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
@@ -248,6 +279,9 @@ export function useSpeechSession(mode: string, promptText?: string) {
           claritySamplesRef.current.push({ atMs, value: clarity });
         }
       }, ANALYSIS_INTERVAL_MS);
+
+      recognition.start();
+      recognitionRef.current = recognition;
 
       timerIntervalRef.current = setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
