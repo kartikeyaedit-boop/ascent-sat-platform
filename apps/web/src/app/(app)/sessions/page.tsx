@@ -42,10 +42,11 @@ export default async function SessionsPage({
           </p>
         </div>
         <Button asChild>
-          <Link href="/practice">
+          {/* Plain anchor, not next/link — see sessions/[id]/page.tsx for why. */}
+          <a href="/practice">
             <Mic className="size-4" />
             Practice
-          </Link>
+          </a>
         </Button>
       </div>
 
@@ -60,7 +61,7 @@ export default async function SessionsPage({
               Your practice sessions will show up here once you record your first one.
             </p>
             <Button asChild className="mt-2">
-              <Link href="/practice">Start practicing</Link>
+              <a href="/practice">Start practicing</a>
             </Button>
           </CardContent>
         </Card>

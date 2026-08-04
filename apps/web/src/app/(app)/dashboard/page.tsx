@@ -51,7 +51,8 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href="/practice">Start practicing</Link>
+            {/* Plain anchor, not next/link — see sessions/[id]/page.tsx for why. */}
+            <a href="/practice">Start practicing</a>
           </Button>
         </CardContent>
       </Card>

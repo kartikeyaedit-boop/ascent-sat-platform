@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,10 +35,15 @@ export default async function SessionReportPage({
           </p>
         </div>
         <Button asChild>
-          <Link href="/practice">
+          {/* Plain anchor, not next/link: forces a full page load so a
+              fresh recording always starts in a clean JS realm — some
+              mobile browsers' SpeechRecognition engine (notably iOS
+              WebKit) stops delivering results on a second use within
+              the same page lifetime, and only a real reload resets it. */}
+          <a href="/practice">
             <Mic className="size-4" />
             Practice again
-          </Link>
+          </a>
         </Button>
       </div>
 

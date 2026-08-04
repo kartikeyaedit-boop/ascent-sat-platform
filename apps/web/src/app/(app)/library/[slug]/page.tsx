@@ -82,10 +82,11 @@ export default async function TechniquePage({
       </Card>
 
       <Button asChild className="w-full">
-        <Link href="/practice">
+        {/* Plain anchor, not next/link — see sessions/[id]/page.tsx for why. */}
+        <a href="/practice">
           <Mic className="size-4" />
           Practice now
-        </Link>
+        </a>
       </Button>
     </div>
   );
