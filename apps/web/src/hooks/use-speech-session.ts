@@ -81,7 +81,7 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
 // pause" case below; iOS just needs it as the primary mechanism instead
 // of a rarely-hit fallback, with a short delay so the native audio
 // session has a moment to actually release between restarts.
-function isIOS(): boolean {
+export function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 const IOS_RESTART_DELAY_MS = 300;
